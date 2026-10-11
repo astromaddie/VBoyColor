@@ -33,6 +33,7 @@
 #include <functional>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -400,7 +401,11 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
 
     VulkanRenderer renderer;
     UiRenderer uiRenderer;
-    Emulator emulator;
+    // On the heap: the emulator is ~700 KB, and this thread's stack (the
+    // native activity's, 1 MB) also holds android_main's frame - on the
+    // stack it overflowed the moment this function was entered.
+    auto emulatorOnHeap = std::make_unique<Emulator>();
+    Emulator &emulator = *emulatorOnHeap;
     AppMenu appMenu;
     AppSettings settings;
     TouchControls touch;

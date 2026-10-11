@@ -12,6 +12,8 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
+#include <memory>
+
 #define LOG_TAG "VBoyColor"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -219,7 +221,10 @@ void android_main(struct android_app *app)
     androidCreateInfo.applicationVM = app->activity->vm;
     androidCreateInfo.applicationActivity = app->activity->clazz;
 
-    OpenXrApp xrApp;
+    // On the heap (~700 KB): this thread's stack is only 1 MB, and the phone
+    // app (RunPhoneApp) needs room below this frame too.
+    auto xrAppOnHeap = std::make_unique<OpenXrApp>();
+    OpenXrApp &xrApp = *xrAppOnHeap;
     bool initialized = false;
 
     bool requestRestart = false;
