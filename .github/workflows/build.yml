@@ -237,20 +237,28 @@ jobs:
     permissions:
       contents: write
     steps:
+      # (release-notes/<tag>.md: what's new, written for players - at the top of the release)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: release-notes
+          path: src
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
 
-      # Which download is for which device - above GitHub's list of changes.
+      # What's new (if written), then which download is for which device - above GitHub's list of changes.
       - name: Release notes
         run: |
           set -e
+          notes="src/release-notes/${GITHUB_REF_NAME}.md"
           cd dist
           apk=$(ls *-quest-android-arm64.apk)
           win=$(ls *-windows-x64.zip)
           lin=$(ls *-linux-x64.tar.gz)
           {
+            if [ -f "../$notes" ]; then cat "../$notes"; echo; fi
             echo "## Which download?"
             echo
             echo "| Your device | Download |"

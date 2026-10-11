@@ -1,11 +1,12 @@
 <h1 align="center"><img src="assets/logo/vboycolor-logo.png" alt="VBoy Color" width="380"></h1>
 
-<p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest, and on PC.</b></p>
+<p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest, on PC, and on Android phones and handhelds.</b></p>
 
 VBoy Color is a free, open-source Virtual Boy emulator. On a Quest headset
 it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
 3D, but in color instead of red on black. On Windows and Linux it plays them
-in a window, no headset needed.
+in a window, no headset needed, and on Android phones, tablets and handhelds
+with touch controls or a gamepad.
 
 <p align="center"><a href="https://youtu.be/vsScgEVnbME"><img src="images/demo-video.jpg" alt="VBoy Color demo video: eight Virtual Boy games, the original red next to VBoy Color" width="720"></a><br>
 <a href="https://youtu.be/vsScgEVnbME"><b>▶ Watch the demo</b></a> - eight games, the original red next to VBoy Color (2 min)</p>
@@ -66,12 +67,16 @@ pack).*
   sticks, a gamepad, the mouse, or by pointing a Quest controller and
   pulling its trigger.
 - **Real 3D on Quest** - each eye gets its own picture, as on the hardware,
-  and both eyes always show the same colors. Where the headset offers it
-  (Quest 2, 3, 3S) the display runs at 100 Hz: two refreshes for each of the
-  Virtual Boy's 50 frames a second, so scrolling stays smooth.
+  and both eyes always show the same colors. The display runs at the
+  headset's highest refresh rate, so scrolling stays smooth.
 - **Save states** - several slots per game, with thumbnails in color.
+- **Gamepads everywhere** - in the PC window, in PC VR and on Android, with
+  the usual emulator layout (the Virtual Boy's A and B where they are on its
+  controller: right and bottom); every pad connected works, and pads plugged
+  in later are picked up.
 - **Button mapping** - Quest controllers, gamepads and keyboard, all
-  remappable.
+  remappable - for all games, or per game (hold a game's card in the
+  library).
 - **Screen looks** - Settings → Screen → Look: *Sharp* pixels, *Smooth*
   (OmniScale's rounded edges and diagonals) or *LED* (the Virtual Boy's
   own rows of light, with a soft glow). Both eyes always get the same
@@ -138,9 +143,11 @@ beside it: the left D-pad with Select and Start (and the menu button under
 them), B and A with the right D-pad above them (only in the games that use
 it - Red Alarm, Teleroboxer, 3-D Tetris and Golf), L and R on top. Settings →
 Touch controls → Edit lets you drag every control where you want it and
-make it bigger or smaller (the buttons are Kenney's Input Prompts). Connect a gamepad and the on-screen buttons step
-aside until you touch the screen again. Back opens the menu, and Back (or
-*Back to game*) returns to the game.
+make it bigger or smaller (the buttons are Kenney's Input Prompts) - and a
+game can have its own layout (hold its card in the library). Connect a
+gamepad and the on-screen buttons step aside until you touch the screen
+again. Back opens the menu, and Back (or *Back to game*) returns to the
+game. With no game loaded, the menu sits inside a Virtual Boy.
 
 ### Windows
 

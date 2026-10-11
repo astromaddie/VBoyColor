@@ -6,7 +6,7 @@ One CMake project builds every version:
 |---|---|---|
 | `VBoyColor` | the desktop app - a window, no headset | Windows, Linux |
 | `VBoyColorVR` | desktop VR - OpenXR, streamed to a headset | Windows |
-| `libvboycolor.so` | the Quest app (built through Gradle in `android/`) | Android (arm64) |
+| `libvboycolor.so` | the Android app - VR on a Quest, the phone app (touch controls) on phones, tablets and handhelds; built through Gradle in `android/` | Android (arm64) |
 
 No Vulkan SDK is needed anywhere: Vulkan is loaded at runtime through `volk`,
 and the shaders are compiled by glslang's C++ API, fetched and built as part
@@ -40,7 +40,7 @@ core/                 shared, platform-independent app code
 platform/             entry points, one per platform
   pc2d/Main.cpp       desktop app (GLFW window)
   pc/Main.cpp         desktop VR (OpenXR)
-  android/            Quest (NativeActivity)
+  android/            Android (NativeActivity): Quest VR, and the phone app (PhoneMain.cpp)
   desktop/            file access shared by both desktop apps
 shaders/              GLSL sources
 assets/runtime/       fonts and icon atlases the app loads
@@ -83,7 +83,7 @@ cd build-pc && ./VBoyColor
 The build copies `fonts/` and `icons/` next to the executable. Any Vulkan 1.1
 driver works (Mesa's lavapipe too, without a GPU).
 
-## Android (Quest)
+## Android (Quest, phones and tablets)
 
 Needs the Android SDK (compileSdk 34, build-tools 34.0.0), NDK 23.2.8568313,
 CMake 3.22.1 and a JDK 17+ (Android Studio's own works:
