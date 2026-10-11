@@ -89,6 +89,13 @@ function(vbgo_generate_patched_vip VB_CORE_DIR OUT_DIR)
         [=[#include "vip.h"
 #include "vbgo_tiletrack.h" /* VirtualBoyGo */]=]
         "vip.c (includes)")
+    # The frame buffers, for the libretro core's state loading (see
+    # vbgo_tiletrack_forget_buffer).
+    _vbgo_replace_once(VIP
+        [=[static uint8 FB[2][2][0x6000];]=]
+        [=[static uint8 FB[2][2][0x6000];
+const uint8_t *vbgo_vip_framebuffers(void) { return &FB[0][0][0]; } /* VirtualBoyGo */]=]
+        "vip.c (the frame buffers)")
     # Each block of 8 lines: tell the tracker where the block's pixels go
     # (it writes its tags straight into its own frame buffer copy).
     _vbgo_replace_once(VIP

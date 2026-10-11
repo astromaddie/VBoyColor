@@ -7,6 +7,7 @@ One CMake project builds every version:
 | `VBoyColor` | the desktop app - a window, no headset | Windows, Linux |
 | `VBoyColorVR` | desktop VR - OpenXR, streamed to a headset | Windows |
 | `libvboycolor.so` | the Android app - VR on a Quest, the phone app (touch controls) on phones, tablets and handhelds; built through Gradle in `android/` | Android (arm64) |
+| `vboycolor_libretro` | the RetroArch core - its own CMake project in `platform/libretro/` (see [RetroArch core](#retroarch-core)) | Windows, Linux, macOS, Android |
 
 No Vulkan SDK is needed anywhere: Vulkan is loaded at runtime through `volk`,
 and the shaders are compiled by glslang's C++ API, fetched and built as part
@@ -21,7 +22,8 @@ git submodule update --init
 ```
 
 Every push is also built by GitHub Actions (`.github/workflows/build.yml`):
-Windows (both desktop apps), Linux (desktop) and Android. A tag `v*` makes a
+Windows (both desktop apps), Linux (desktop), Android, and the RetroArch
+core for Windows, Linux x86-64 and ARM64, macOS and Android. A tag `v*` makes a
 GitHub release with all of them attached.
 
 ## Project layout
@@ -42,6 +44,7 @@ platform/             entry points, one per platform
   pc/Main.cpp         desktop VR (OpenXR)
   android/            Android (NativeActivity): Quest VR, and the phone app (PhoneMain.cpp)
   desktop/            file access shared by both desktop apps
+  libretro/           the RetroArch core (its own CMake project)
 shaders/              GLSL sources
 assets/runtime/       fonts and icon atlases the app loads
 third_party/          Beetle VB (submodule), stb, miniaudio
@@ -170,3 +173,38 @@ side). Change the logo, run it, commit the outputs.
 for Python (`ctypes`): load a ROM and save states, run frames, read both
 eyes' pixels. The color pack tools and regression checks use it; it never
 opens a window.
+
+## RetroArch core
+
+`platform/libretro/` builds VBoy Color as a libretro core, apart from the
+app (no Vulkan, OpenXR or window code - only the emulator and the coloring):
+
+```
+cmake -S platform/libretro -B build/libretro -DCMAKE_BUILD_TYPE=Release
+cmake --build build/libretro --config Release
+```
+
+That gives `build/libretro/vboycolor_libretro.so` (`Release\vboycolor_libretro.dll`
+on Windows, `.dylib` on macOS). For Android add
+`-DCMAKE_TOOLCHAIN_FILE=<NDK>/build/cmake/android.toolchain.cmake
+-DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21`
+(`vboycolor_libretro_android.so`); for a universal macOS core,
+`-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
+
+How it fits together:
+
+- **Beetle VB** is compiled with its `retro_*` entry points renamed
+  `beetle_retro_*` (`platform/libretro/beetle_rename.h`, a forced include),
+  with the app's patched VIP (tile tracking, shade tags).
+- **`libretro_core.cpp`** is the core the frontend sees. It passes most calls
+  through to Beetle VB and colors every frame on the CPU with the app's own
+  code (`core/emu`: ShadeColorizer, ColorPackRenderer, TileColorPack;
+  the color schemes in `ColorSchemes.h`, shared with the app's settings).
+  Then it lays out both eyes for the 3D option. Its core options replace
+  Beetle VB's 3D and palette options.
+- **The color packs** are zipped into the core at build time
+  (`cmake/EmbedColorPacks.cmake`, with an index of the ROMs they were made
+  for) and inflated when a game loads.
+- **Save states** are Beetle VB's. Loading one forgets the tile tracker's
+  tags for any frame buffer that changed a lot. Rewind and run-ahead, which
+  load states a frame or two away, keep their colors.

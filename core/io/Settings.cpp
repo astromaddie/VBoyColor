@@ -127,48 +127,8 @@ namespace
 {
     std::string GameColorsFile(const std::string &game) { return game + ".colors"; }
 
-    // Games that look best in a particular scheme when nobody has picked one:
-    // by the ROM's CRC-32, else a part of its name (lower case). Picked by
-    // rendering each game's title and play screens in every scheme (Oct 2026,
-    // the games without a color pack). Everything else starts in Auto - the
-    // games with a pack, and those Auto suits (Space Pinball; Red Alarm, its
-    // wireframes by depth; the games with a pack listed here say so).
-    // Multicolor palettes, by index in kShadePalettes:
-    constexpr int kArcade = 0, kNeon = 1, kCandy = 2, kFireLeaf = 3, kOcean = 7, kSunsetM = 8;
-    struct Suggestion
-    {
-        uint32_t crc;
-        const char *nameContains;
-        int shadePalette; // kAutoColors, a Multicolor palette, or -1
-        int pattern;      // a gradient (with shadePalette -1), else -1
-    };
-    constexpr Suggestion kSuggestions[] = {
-        {0x133e9372, "wario land", kAutoColors, -1}, // its color pack (it started in Gradient, Sunset before it had one)
-        {0xbb71b522, "3-d tetris", kAutoColors, -1}, // the well by depth (DepthColors.h), menus, HUD and title by its pack
-        {0xe81a3703, "bound high", kAutoColors, -1}, // its color pack (it started in Arcade before it had one)
-        {0x193c1a2f, "dragon hopper", kAutoColors, -1}, // its color pack
-        {0x2199af41, "golf", kFireLeaf, -1}, // green fairways (drawn without tiles) - its color pack colors the menus and hole maps
-        {0x6ba07915, "virtual golf", kFireLeaf, -1}, // (Golf's pack fits it too)
-        {0x83cb6a00, "innsmouth", kAutoColors, -1}, // its color pack (it started in Ocean before it had one)
-        {0xdf4d56b4, "funky bowling", kCandy, -1},
-        {0xf3cd40dd, "niko-chan", kArcade, -1},
-        {0x19bb2dfb, "panic bomber", kAutoColors, -1}, // its color pack (scenery) - Panibon uses it too
-        {0x40498f5e, "panibon", kAutoColors, -1},
-        {0xaa10a7b4, "red alarm", kAutoColors, -1}, // wireframes colored by depth (DepthColors.h), HUD and menus by its pack
-        {0x7e85c45d, "red alarm", kAutoColors, -1},
-        {0x44788197, "gundam", kOcean, -1},
-        {0xfa44402d, "space invaders", kAutoColors, -1}, // its color pack (it started in Neon before it had one)
-        {0x60895693, "space squash", kNeon, -1},
-        {0x3ccb67ae, "v-tetris", kAutoColors, -1}, // its color pack
-        {0x4c32ba5e, "vertical force", kAutoColors, -1}, // its color pack - the Japanese release uses it too
-        {0x9e9b8b92, "vertical force", kAutoColors, -1},
-        {0x20688279, "virtual bowling", kSunsetM, -1}, // wooden lanes - its color pack paints the HUD, gauges and menus over them
-        {0x526cc969, "virtual fishing", kOcean, -1},
-        {0x8989fe0a, "virtual lab", kCandy, -1},
-        {0x736b40d6, "league baseball", kArcade, -1},
-        {0x9ba8bb5e, "yakyuu", kArcade, -1},
-        {0x82a95e51, "waterworld", kOcean, -1},
-    };
+    using ColorSchemes::kSuggestions;
+    using Suggestion = ColorSchemes::Suggestion;
 } // namespace
 
 void AppSettings::SaveGameColors(Platform &platform, const std::string &game) const
@@ -222,7 +182,7 @@ void AppSettings::ApplyGameColors(Platform &platform, const std::string &game, u
             found = &suggestion;
     if (found)
     {
-        selectedShadePalette = found->shadePalette;
-        selectedPattern = found->pattern;
+        selectedShadePalette = found->multicolor;
+        selectedPattern = found->gradient;
     }
 }

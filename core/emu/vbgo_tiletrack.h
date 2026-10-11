@@ -83,6 +83,15 @@ bool vbgo_tiletrack_is_enabled(void);
  * buffers now wasn't drawn by anything tracked - a game that draws with its
  * CPU and never runs a drawing pass would otherwise keep showing the old tags). */
 void vbgo_tiletrack_reset(void);
+/* Forget one frame buffer eye's tags, as if the CPU had drawn all of it (a
+ * save state put other pixels there). The libretro core's way of loading a
+ * state: rewinding and run-ahead load states only a frame or two away, whose
+ * buffers still hold nearly what was tracked - only the ones that changed a
+ * lot are forgotten (platform/libretro/libretro_core.cpp). */
+void vbgo_tiletrack_forget_buffer(unsigned fb, unsigned lr);
+/* The VIP's frame buffers, FB[fb][lr][0x6000] (a function the patched vip.c
+ * adds - see cmake/PatchBeetleVip.cmake). */
+const uint8_t *vbgo_vip_framebuffers(void);
 
 #define VBGO_TT_FILLS_NONE 0
 #define VBGO_TT_FILLS_PACK 1 /* only in cells marked with vbgo_tiletrack_set_fill_cells */

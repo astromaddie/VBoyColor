@@ -1,5 +1,6 @@
 #pragma once
 
+#include "emu/ColorSchemes.h"
 #include "input/ButtonMapping.h"
 
 #include <openxr/openxr.h> // XrColor4f
@@ -19,7 +20,7 @@ inline constexpr int kFirstGradientShadePalette = 6;
 // by what drew each pixel - its layer's depth, a sprite's palette (see
 // core/emu/AutoColors.h) - under a game's color pack, if it has one. The
 // default, so a game shows in color (its pack's, if any) out of the box.
-inline constexpr int kAutoColors = 100;
+inline constexpr int kAutoColors = ColorSchemes::kAutoColors;
 
 // How the screen/menu quads react to head rotation - see
 // OpenXrApp::ComputeScreenOrientation.
@@ -229,69 +230,31 @@ public:
 
 // Preset VB screen colors. Index 0 is the authentic red Virtual Boy display
 // and the factory default.
-inline constexpr std::array<XrColor4f, 11> kPredefColors = {{
-    {1.0f, 0.0f, 0.0f, 1.0f},
-    {0.9f, 0.3f, 0.1f, 1.0f},
-    {1.0f, 0.85f, 0.1f, 1.0f},
-    {0.25f, 1.0f, 0.1f, 1.0f},
-    {0.0f, 1.0f, 0.45f, 1.0f},
-    {0.0f, 1.0f, 0.85f, 1.0f},
-    {0.0f, 0.85f, 1.0f, 1.0f},
-    {0.15f, 1.0f, 1.0f, 1.0f},
-    {0.75f, 0.65f, 1.0f, 1.0f},
-    {1.0f, 1.0f, 1.0f, 1.0f},
-    {1.0f, 0.3f, 0.2f, 1.0f},
-}};
+inline constexpr std::array<XrColor4f, ColorSchemes::kTintCount> kPredefColors = []()
+{
+    std::array<XrColor4f, ColorSchemes::kTintCount> out{};
+    for (int i = 0; i < ColorSchemes::kTintCount; ++i)
+        out[i] = {ColorSchemes::kTints[i].r, ColorSchemes::kTints[i].g, ColorSchemes::kTints[i].b, 1.0f};
+    return out;
+}();
 inline constexpr int kPredefColorCount = static_cast<int>(kPredefColors.size());
 
 // Named multi-hue gradients (5 stops each, darkest to brightest) - shared
 // by screen_pattern.frag's rendering and the Color Palette row's preview
 // swatches (SettingsPage::DrawColorPreview), so no color data is duplicated
 // into the shader itself.
-inline constexpr std::array<std::array<XrColor4f, 5>, 6> kScreenPatterns = {{
-    // Jade - near black -> deep green -> teal -> yellow-green -> cream white
-    {{{0.02f, 0.03f, 0.02f, 1.0f}, {0.05f, 0.20f, 0.10f, 1.0f}, {0.10f, 0.45f, 0.40f, 1.0f}, {0.55f, 0.75f, 0.35f, 1.0f}, {0.97f, 0.96f, 0.85f, 1.0f}}},
-    // Ocean - near black -> navy -> azure -> sky blue -> ice white
-    {{{0.01f, 0.02f, 0.04f, 1.0f}, {0.05f, 0.15f, 0.35f, 1.0f}, {0.10f, 0.35f, 0.65f, 1.0f}, {0.55f, 0.80f, 0.90f, 1.0f}, {0.95f, 0.98f, 1.00f, 1.0f}}},
-    // Sunset - near black -> deep purple -> magenta -> orange -> pale gold
-    {{{0.04f, 0.01f, 0.05f, 1.0f}, {0.30f, 0.05f, 0.35f, 1.0f}, {0.75f, 0.20f, 0.25f, 1.0f}, {0.95f, 0.55f, 0.20f, 1.0f}, {1.00f, 0.92f, 0.75f, 1.0f}}},
-    // Ember - near black -> maroon -> deep red -> amber -> pale yellow
-    {{{0.03f, 0.01f, 0.00f, 1.0f}, {0.35f, 0.04f, 0.02f, 1.0f}, {0.65f, 0.15f, 0.02f, 1.0f}, {0.95f, 0.55f, 0.10f, 1.0f}, {1.00f, 0.95f, 0.75f, 1.0f}}},
-    // Frost - near black -> indigo -> violet -> lavender -> ice white
-    {{{0.02f, 0.02f, 0.05f, 1.0f}, {0.15f, 0.15f, 0.40f, 1.0f}, {0.40f, 0.35f, 0.70f, 1.0f}, {0.75f, 0.75f, 0.95f, 1.0f}, {0.98f, 0.98f, 1.00f, 1.0f}}},
-    // Toxic - near black -> dark olive -> teal-green -> chartreuse -> pale lime
-    {{{0.02f, 0.03f, 0.00f, 1.0f}, {0.15f, 0.30f, 0.02f, 1.0f}, {0.35f, 0.55f, 0.05f, 1.0f}, {0.65f, 0.85f, 0.15f, 1.0f}, {0.95f, 1.00f, 0.70f, 1.0f}}},
-}};
-inline constexpr int kScreenPatternCount = static_cast<int>(kScreenPatterns.size());
-
-namespace SettingsDetail
+inline constexpr std::array<std::array<XrColor4f, 5>, ColorSchemes::kGradientCount> kScreenPatterns = []()
 {
-    // 0xRRGGBB -> XrColor4f, so the palette table below can be written (and
-    // compared against reference palettes) as familiar hex codes.
-    constexpr XrColor4f Hex(uint32_t rgb)
-    {
-        return {((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f, 1.0f};
-    }
-
-    constexpr std::array<XrColor4f, 4> Hex4(uint32_t bg, uint32_t dark, uint32_t light, uint32_t lightest)
-    {
-        return {{Hex(bg), Hex(dark), Hex(light), Hex(lightest)}};
-    }
-
-    // A gradient pattern's per-shade equivalent: its darkest stop as the
-    // background and its 3 brightest stops for the 3 drawn shades - about
-    // what the gradient itself shows at a typical game's full brightness
-    // (e.g. Virtual Boy Wario Land's), but held steady through fades. Read
-    // straight from kScreenPatterns, so the two can't drift apart. Only the
-    // starting point: the emulator colors with all 5 stops, each shade where
-    // the game's brightness for it falls on the gradient (see
-    // ShadeColorizer::SetGradient).
-    constexpr std::array<XrColor4f, 4> FromPattern(int pattern)
-    {
-        const auto &stops = kScreenPatterns[pattern];
-        return {{stops[0], stops[2], stops[3], stops[4]}};
-    }
-} // namespace SettingsDetail
+    std::array<std::array<XrColor4f, 5>, ColorSchemes::kGradientCount> out{};
+    for (int p = 0; p < ColorSchemes::kGradientCount; ++p)
+        for (int i = 0; i < 5; ++i)
+        {
+            const ColorSchemes::Rgb &c = ColorSchemes::kGradients[p][i];
+            out[p][i] = {c.r, c.g, c.b, 1.0f};
+        }
+    return out;
+}();
+inline constexpr int kScreenPatternCount = static_cast<int>(kScreenPatterns.size());
 
 // Per-shade ("Multicolor") palettes (AppSettings::selectedShadePalette) -
 // one color for each of the VB's 4 shades: background (the VB's black), then
@@ -300,31 +263,19 @@ namespace SettingsDetail
 // brightness, these color each pixel by which shade it is
 // (core/emu/ShadeColorizer.h) - the colorization approach Red Viper
 // (github.com/skyfloogle/red-viper) introduced, which keeps each layer's hue
-// stable through fades. At full brightness each shade appears as exactly the
-// color listed, in every game. Order matters only for the Color Palette
-// cycle (index 0 is what Multicolor mode starts on); the index is what's
-// saved to settings.dat.
-inline constexpr std::array<std::array<XrColor4f, 4>, 16> kShadePalettes = {{
-    // --- Vivid multi-hue ---
-    SettingsDetail::Hex4(0x050A24, 0xE0301E, 0x2E7DF0, 0xFFE14D), // Arcade - red / blue / yellow on navy
-    SettingsDetail::Hex4(0x0B0614, 0x7A1FA2, 0x00B8D4, 0xF4FF81), // Neon - purple / cyan / lime
-    SettingsDetail::Hex4(0x160A1C, 0x6A3FB5, 0xFF5FA2, 0xB8F4FF), // Candy - violet / pink / ice
-    SettingsDetail::Hex4(0x080200, 0x8C2A0A, 0x1DBB00, 0xFFD800), // Fire & leaf - rust / green / gold (after Red Viper's multicolour default)
-    SettingsDetail::Hex4(0x03141A, 0x8E2C6B, 0x1FB3A6, 0xFFD9A0), // Tropical - plum / teal / peach
-    SettingsDetail::Hex4(0x000000, 0xAA00AA, 0x00AAAA, 0xFFFFFF), // Retro PC - magenta / cyan / white
-    // --- The gradient patterns, per shade ---
-    SettingsDetail::FromPattern(0), // Jade
-    SettingsDetail::FromPattern(1), // Ocean
-    SettingsDetail::FromPattern(2), // Sunset
-    SettingsDetail::FromPattern(3), // Ember
-    SettingsDetail::FromPattern(4), // Frost
-    SettingsDetail::FromPattern(5), // Toxic
-    // --- Classic handheld looks (light ones fade toward their light background) ---
-    SettingsDetail::Hex4(0x9BBC0F, 0x6A8F1C, 0x306230, 0x0F380F), // LCD green, light background (dark shade spaced off the background so it stays readable)
-    SettingsDetail::Hex4(0x0F380F, 0x306230, 0x8BAC0F, 0x9BBC0F), // LCD green, dark background
-    SettingsDetail::Hex4(0xF8E8C8, 0xD89048, 0xA82820, 0x301850), // Super warm - cream / orange / red / plum
-    SettingsDetail::Hex4(0xF4EFE1, 0x8C877B, 0x4A463F, 0x141414), // Paper - dark ink on off-white
-}};
+// stable through fades. The colors are ColorSchemes::kMulticolor's; the
+// index is what's saved to settings.dat.
+inline constexpr std::array<std::array<XrColor4f, 4>, ColorSchemes::kMulticolorCount> kShadePalettes = []()
+{
+    std::array<std::array<XrColor4f, 4>, ColorSchemes::kMulticolorCount> out{};
+    for (int p = 0; p < ColorSchemes::kMulticolorCount; ++p)
+        for (int i = 0; i < 4; ++i)
+        {
+            const ColorSchemes::Rgb &c = ColorSchemes::kMulticolor[p].s[i];
+            out[p][i] = {c.r, c.g, c.b, 1.0f};
+        }
+    return out;
+}();
 inline constexpr int kShadePaletteCount = static_cast<int>(kShadePalettes.size());
 
 // The gradient pattern a per-shade palette was made from, or -1.

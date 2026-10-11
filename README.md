@@ -6,7 +6,8 @@ VBoy Color is a free, open-source Virtual Boy emulator. On a Quest headset
 it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
 3D, but in color instead of red on black. On Windows and Linux it plays them
 in a window, no headset needed, and on Android phones, tablets and handhelds
-with touch controls or a gamepad.
+with touch controls or a gamepad. It is also a RetroArch core, for Windows,
+Linux, macOS and Android.
 
 <p align="center"><a href="https://youtu.be/vsScgEVnbME"><img src="images/demo-video.jpg" alt="VBoy Color demo video: eight Virtual Boy games, the original red next to VBoy Color" width="720"></a><br>
 <a href="https://youtu.be/vsScgEVnbME"><b>▶ Watch the demo</b></a> - eight games, the original red next to VBoy Color (2 min)</p>
@@ -191,6 +192,32 @@ VR version for a PC headset (Quest Link, Virtual Desktop or SteamVR).
 
 Download `VBoyColor-<version>-linux-x64.tar.gz`, unpack it, put your ROMs in
 `roms` and run `./VBoyColor` from that folder. Needs a Vulkan driver.
+
+### RetroArch
+
+VBoy Color is also a RetroArch core (or for any other libretro frontend):
+the same emulation and colors, with the 3D for a normal screen. Download
+`vboycolor_libretro-<version>-<platform>.zip` for Windows, Linux (x86-64 or
+ARM64), macOS or Android from
+[Releases](https://github.com/yuk27/VBoyColor/releases), then:
+
+1. Copy the core (`vboycolor_libretro.dll`, `.so` or `.dylib`) into
+   RetroArch's cores folder (Settings → Directory → Cores shows where it is),
+   and `vboycolor_libretro.info` into its core info folder (Settings →
+   Directory → Core Info), so the menus show its name and details. On
+   Android, use Load Core → Install or Restore a Core and pick
+   `vboycolor_libretro_android.so`.
+2. Load Core → **Nintendo - Virtual Boy (VBoy Color)**, then load a game.
+3. Quick Menu → Core Options: **Colors** (the game's own, Auto,
+   Multicolor, Gradient or Tint, and their palettes), **Color packs**, and
+   **3D** - side by side (also cross-eyed or half width for a 3D TV), top and
+   bottom, or red / cyan, green / magenta and amber / blue glasses.
+
+The color packs are built in; a `.vbcp` file beside the ROM, with the ROM's
+name, takes the place of its game's pack. RetroArch's save states, rewind,
+run-ahead, shaders and RetroAchievements work as with any other core. On
+macOS, if RetroArch won't load the core, clear the download's quarantine
+first: `xattr -d com.apple.quarantine vboycolor_libretro.dylib`.
 
 ## Controls
 

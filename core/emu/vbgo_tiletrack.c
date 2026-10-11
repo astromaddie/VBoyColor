@@ -113,6 +113,12 @@ void vbgo_tiletrack_reset(void)
    s_cpu[0] = s_cpu[1] = 1;
 }
 
+void vbgo_tiletrack_forget_buffer(unsigned fb, unsigned lr)
+{
+   memset(s_fb[fb & 1][lr & 1], 0, sizeof(s_fb[0][0]));
+   s_cpu[fb & 1] = 1;
+}
+
 void vbgo_tiletrack_set_fill_mode(int mode) { vbgo_tt_fill = mode; }
 
 int vbgo_tiletrack_fill_mode(void) { return vbgo_tt_fill; }
