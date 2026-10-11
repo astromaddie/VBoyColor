@@ -66,7 +66,7 @@ DEFAULT_SRC = REPO_ROOT / "assets" / "icons"
 ATLAS_OUT_DIR = REPO_ROOT / "assets" / "runtime" / "icons"
 ATLAS_SIZES = (10, 20, 30, 40, 50, 60)
 ATLAS_COLUMNS = 8
-HEADER_OUT = REPO_ROOT / "core" / "ui" / "generated_icons" / "UiIconAtlas.h"
+HEADER_OUT = REPO_ROOT / "core" / "gfx" / "generated_icons" / "UiIconAtlas.h"
 
 
 def main():

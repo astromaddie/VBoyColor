@@ -37,6 +37,12 @@ Portions of this software are copyright © 2023 The FreeType Project
 |---|---|
 | Roboto (Regular, Bold) - Copyright 2011 Google Inc. | Apache-2.0 (`licenses/Apache-2.0.txt`) |
 
+## Icons
+
+| Icons | License |
+|---|---|
+| The menu's A / B / X / Y button icons - [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney (kenney.nl) | CC0 1.0 (public domain) - credit given gladly |
+
 ## Build tools (not shipped)
 
 [glslang](https://github.com/KhronosGroup/glslang) compiles the shaders on

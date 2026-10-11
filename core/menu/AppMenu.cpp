@@ -752,7 +752,7 @@ void AppMenu::DrawHints(UiRenderer &ui)
 {
     const float lineY = kMenuHeight - kHintsHeight;
     ui.DrawQuad(kContentX - 2.0f, lineY, kContentRight - kContentX + 4.0f, 0.6f, kMenuLineColor);
-    constexpr float kIcon = 8.0f, kIconGap = 2.5f, kGroupGap = 9.0f;
+    constexpr float kIcon = 10.0f, kIconGap = 3.0f, kGroupGap = 9.0f;
     const float centerY = lineY + kHintsHeight / 2.0f + 0.5f;
     const UiFontHandle font = m_resources.cardFont;
     float x = kContentX;
