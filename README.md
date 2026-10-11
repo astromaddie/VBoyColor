@@ -41,8 +41,8 @@ pack).*
     (Jade, Ocean, Sunset, Ember, Frost, Toxic).
   - **Tint** - the classic look: red, or any color you mix.
 - **Color packs** - hand-painted colors for a game, tile by tile, shown in
-  Auto and Multicolor modes. Packs for Bound High, Galactic Pinball, Innsmouth no
-  Yakata, Jack Bros., Mario Clash, Mario's Tennis, Panic Bomber, Space
+  Auto and Multicolor modes. Packs for Bound High, Dragon Hopper, Galactic Pinball,
+  Innsmouth no Yakata, Jack Bros., Mario Clash, Mario's Tennis, Panic Bomber, Space
   Invaders Virtual Collection, Teleroboxer, Vertical Force, V-Tetris and Wario
   Land are built in, plus the menus and HUD of Red Alarm and 3-D Tetris
   (their 3-D worlds are drawn without tiles, so Auto colors them by depth),
@@ -66,7 +66,9 @@ pack).*
   sticks, a gamepad, the mouse, or by pointing a Quest controller and
   pulling its trigger.
 - **Real 3D on Quest** - each eye gets its own picture, as on the hardware,
-  and both eyes always show the same colors.
+  and both eyes always show the same colors. Where the headset offers it
+  (Quest 2, 3, 3S) the display runs at 100 Hz: two refreshes for each of the
+  Virtual Boy's 50 frames a second, so scrolling stays smooth.
 - **Save states** - several slots per game, with thumbnails in color.
 - **Button mapping** - Quest controllers, gamepads and keyboard, all
   remappable.
@@ -83,6 +85,9 @@ pack).*
   *colored glasses* - *red / cyan*, *green / magenta* or *amber / blue*
   (mixed with Dubois' method, which keeps the games' colors as true as the
   glasses allow).
+
+  <p align="center"><img src="images/3d-glasses.gif" alt="Teleroboxer for colored 3D glasses: red / cyan, green / magenta, amber / blue" width="384">
+  <img src="images/3d-side-by-side.gif" alt="Mario's Tennis side by side (full, 3D TV, cross-eyed) and top and bottom (full, 3D TV)" width="384"></p>
 - **Your room as the background** (Quest) - Settings → Adjust screen →
   Show your room around it: the game floats in your room (passthrough)
   instead of in the dark.
@@ -133,7 +138,7 @@ beside it: the left D-pad with Select and Start (and the menu button under
 them), B and A with the right D-pad above them (only in the games that use
 it - Red Alarm, Teleroboxer, 3-D Tetris and Golf), L and R on top. Settings →
 Touch controls → Edit lets you drag every control where you want it and
-make it bigger or smaller. Connect a gamepad and the on-screen buttons step
+make it bigger or smaller (the buttons are Kenney's Input Prompts). Connect a gamepad and the on-screen buttons step
 aside until you touch the screen again. Back opens the menu, and Back (or
 *Back to game*) returns to the game.
 
@@ -204,5 +209,10 @@ Other components and fonts are listed in
 - **[Red Viper](https://github.com/skyfloogle/red-viper)** - the Virtual Boy
   emulator for the 3DS, for the idea of coloring the four shades (its
   multicolour mode). No Red Viper code is used.
+- **[Super Bit Shader](https://github.com/AshleyPikachu/Super-Bit-Shader)** by
+  Ashley the Pikachu - RetroArch shaders that color the Virtual Boy, the Game
+  Boy and the other monochrome handhelds, with side-by-side 3D for the
+  Virtual Boy in VR. Thank you for keeping the colored Virtual Boy scene
+  going with your great work. No Super Bit Shader code is used.
 - The libraries and fonts listed in
   [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
