@@ -15,6 +15,7 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <sys/system_properties.h>
 #endif
 
 namespace
@@ -31,6 +32,48 @@ namespace
         std::fputc('\n', stderr);
 #endif
         va_end(args);
+    }
+
+    // Quest 3 runs at 100Hz - two refreshes for each of the Virtual Boy's
+    // 50 frames, the smoothest it can be - but the rates OpenXR offers an
+    // app may leave it out (72, 80, 90, 120). The compositor also follows
+    // the debug.oculus.refreshRate system property (what Quest Games
+    // Optimizer sets). Whether an app is allowed to set it isn't documented:
+    // tried, and the outcome logged. The value it had is put back when the
+    // session ends, so no other app is left at 100Hz.
+    constexpr const char *kRefreshProperty = "debug.oculus.refreshRate";
+    std::string g_refreshPropertyBefore;
+    bool g_refreshPropertySet = false;
+
+    bool TryForce100Hz()
+    {
+#ifdef __ANDROID__
+        char before[PROP_VALUE_MAX] = {};
+        __system_property_get(kRefreshProperty, before);
+        if (!g_refreshPropertySet)
+            g_refreshPropertyBefore = before;
+        const int result = __system_property_set(kRefreshProperty, "100");
+        char now[PROP_VALUE_MAX] = {};
+        __system_property_get(kRefreshProperty, now);
+        const bool ok = std::strcmp(now, "100") == 0;
+        g_refreshPropertySet = g_refreshPropertySet || (ok && result == 0);
+        XrLogLine("[OpenXR] %s=100: %s (was \"%s\", now \"%s\")", kRefreshProperty,
+                  ok ? "set" : "not allowed", before, now);
+        return ok;
+#else
+        return false;
+#endif
+    }
+
+    void RestoreRefreshProperty()
+    {
+#ifdef __ANDROID__
+        if (!g_refreshPropertySet)
+            return;
+        __system_property_set(kRefreshProperty, g_refreshPropertyBefore.c_str());
+        g_refreshPropertySet = false;
+        XrLogLine("[OpenXR] %s back to \"%s\"", kRefreshProperty, g_refreshPropertyBefore.c_str());
+#endif
     }
 } // namespace
 
@@ -542,11 +585,20 @@ void OpenXrApp::RequestMaxDisplayRefreshRate()
         if (ratio >= 1.5f && std::abs(ratio - std::round(ratio)) <= 0.015f * ratio)
             bestMultiple = std::max(bestMultiple, rate);
     }
-    const float best = bestMultiple > 0.0f ? bestMultiple : bestAny;
+    float best = bestMultiple > 0.0f ? bestMultiple : bestAny;
 
     std::string offered;
     for (const float rate : rates)
         offered += (offered.empty() ? "" : ", ") + std::to_string(static_cast<int>(std::lround(rate)));
+    // No multiple of the VB's rate offered: 100Hz through the system
+    // property, if the headset lets the app set it - then nothing is asked
+    // of OpenXR (a request would override it).
+    if (bestMultiple <= 0.0f && TryForce100Hz())
+    {
+        XrLogLine("[OpenXR] Display refresh rates offered: %s Hz - 100 Hz through %s instead", offered.c_str(),
+                  kRefreshProperty);
+        return;
+    }
     const XrResult requested = best > 0.0f ? pfnRequestRate(m_session, best) : XR_ERROR_VALIDATION_FAILURE;
     XrLogLine("[OpenXR] Display refresh rates offered: %s Hz - asked for %.0f Hz%s%s", offered.c_str(), best,
               bestMultiple > 0.0f ? " (a multiple of the VB's 50.27Hz)" : "", XR_SUCCEEDED(requested) ? "" : " (refused)");
@@ -568,11 +620,19 @@ void OpenXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChanged &
         RequestMaxDisplayRefreshRate();
         break;
     }
+    case XR_SESSION_STATE_FOCUSED:
+        // (Horizon OS may put the property back after the headset sleeps or
+        // the system menu opens - set again whenever the app has the focus)
+        if (g_refreshPropertySet)
+            TryForce100Hz();
+        break;
     case XR_SESSION_STATE_STOPPING:
         m_sessionRunning = false;
+        RestoreRefreshProperty();
         xrEndSession(m_session);
         break;
     case XR_SESSION_STATE_EXITING:
+        RestoreRefreshProperty();
         exitRenderLoop = true;
         requestRestart = false;
         break;
