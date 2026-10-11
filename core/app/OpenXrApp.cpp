@@ -36,43 +36,20 @@ namespace
 
     // Quest 3 runs at 100Hz - two refreshes for each of the Virtual Boy's
     // 50 frames, the smoothest it can be - but the rates OpenXR offers an
-    // app may leave it out (72, 80, 90, 120). The compositor also follows
-    // the debug.oculus.refreshRate system property (what Quest Games
-    // Optimizer sets). Whether an app is allowed to set it isn't documented:
-    // tried, and the outcome logged. The value it had is put back when the
-    // session ends, so no other app is left at 100Hz.
-    constexpr const char *kRefreshProperty = "debug.oculus.refreshRate";
-    std::string g_refreshPropertyBefore;
-    bool g_refreshPropertySet = false;
-
-    bool TryForce100Hz()
+    // app leave it out (72, 80, 90, 120). The compositor also follows the
+    // debug.oculus.refreshRate system property, which only adb's shell may
+    // set (an app is refused - tried: "Permission denied") - what Quest
+    // Games Optimizer does, or "adb shell setprop debug.oculus.refreshRate
+    // 100". When it's set, the player chose that rate: nothing is asked of
+    // OpenXR (a request would override it). Returns it ("" not set).
+    std::string ForcedRefreshRate()
     {
 #ifdef __ANDROID__
-        char before[PROP_VALUE_MAX] = {};
-        __system_property_get(kRefreshProperty, before);
-        if (!g_refreshPropertySet)
-            g_refreshPropertyBefore = before;
-        const int result = __system_property_set(kRefreshProperty, "100");
-        char now[PROP_VALUE_MAX] = {};
-        __system_property_get(kRefreshProperty, now);
-        const bool ok = std::strcmp(now, "100") == 0;
-        g_refreshPropertySet = g_refreshPropertySet || (ok && result == 0);
-        XrLogLine("[OpenXR] %s=100: %s (was \"%s\", now \"%s\")", kRefreshProperty,
-                  ok ? "set" : "not allowed", before, now);
-        return ok;
+        char value[PROP_VALUE_MAX] = {};
+        __system_property_get("debug.oculus.refreshRate", value);
+        return std::atoi(value) > 0 ? value : "";
 #else
-        return false;
-#endif
-    }
-
-    void RestoreRefreshProperty()
-    {
-#ifdef __ANDROID__
-        if (!g_refreshPropertySet)
-            return;
-        __system_property_set(kRefreshProperty, g_refreshPropertyBefore.c_str());
-        g_refreshPropertySet = false;
-        XrLogLine("[OpenXR] %s back to \"%s\"", kRefreshProperty, g_refreshPropertyBefore.c_str());
+        return "";
 #endif
     }
 } // namespace
@@ -590,13 +567,11 @@ void OpenXrApp::RequestMaxDisplayRefreshRate()
     std::string offered;
     for (const float rate : rates)
         offered += (offered.empty() ? "" : ", ") + std::to_string(static_cast<int>(std::lround(rate)));
-    // No multiple of the VB's rate offered: 100Hz through the system
-    // property, if the headset lets the app set it - then nothing is asked
-    // of OpenXR (a request would override it).
-    if (bestMultiple <= 0.0f && TryForce100Hz())
+    const std::string forced = ForcedRefreshRate();
+    if (!forced.empty())
     {
-        XrLogLine("[OpenXR] Display refresh rates offered: %s Hz - 100 Hz through %s instead", offered.c_str(),
-                  kRefreshProperty);
+        XrLogLine("[OpenXR] Display refresh rates offered: %s Hz - left at %s Hz (debug.oculus.refreshRate)",
+                  offered.c_str(), forced.c_str());
         return;
     }
     const XrResult requested = best > 0.0f ? pfnRequestRate(m_session, best) : XR_ERROR_VALIDATION_FAILURE;
@@ -620,19 +595,11 @@ void OpenXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChanged &
         RequestMaxDisplayRefreshRate();
         break;
     }
-    case XR_SESSION_STATE_FOCUSED:
-        // (Horizon OS may put the property back after the headset sleeps or
-        // the system menu opens - set again whenever the app has the focus)
-        if (g_refreshPropertySet)
-            TryForce100Hz();
-        break;
     case XR_SESSION_STATE_STOPPING:
         m_sessionRunning = false;
-        RestoreRefreshProperty();
         xrEndSession(m_session);
         break;
     case XR_SESSION_STATE_EXITING:
-        RestoreRefreshProperty();
         exitRenderLoop = true;
         requestRestart = false;
         break;

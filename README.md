@@ -156,6 +156,12 @@ pack).*
 4. Open VBoy Color from **Unknown Sources** in the app library and pick that
    folder when it asks.
 
+**Smoother on Quest 3:** the Virtual Boy draws 50 frames a second, and Quest
+3 can refresh at 100 Hz - two refreshes for every frame - but an app isn't
+allowed to pick that rate itself. [Quest Games Optimizer](https://anagan79.itch.io/quest-games-optimizer)
+can, or `adb shell setprop debug.oculus.refreshRate 100` (until the headset
+restarts); VBoy Color then keeps it instead of asking for 120 Hz.
+
 ### Android phones and tablets
 
 The same `VBoyColor-<version>-quest-android-arm64.apk` works on phones, tablets
