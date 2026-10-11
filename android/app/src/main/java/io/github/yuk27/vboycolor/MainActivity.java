@@ -1,6 +1,9 @@
 package io.github.yuk27.vboycolor;
 
+import android.app.AlertDialog;
 import android.app.NativeActivity;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -412,9 +415,45 @@ public class MainActivity extends NativeActivity {
 
     // A headset (the VR app) or a phone/tablet (the flat app with touch
     // controls - see platform/android/PhoneMain.cpp).
+    // A Quest by its maker; another device only if it both claims head
+    // tracking and has an OpenXR runtime to run the VR app with (some phones
+    // and handhelds claim head tracking without one).
     public boolean isHeadset() {
-        return getPackageManager().hasSystemFeature("android.hardware.vr.headtracking")
-                || "Oculus".equalsIgnoreCase(Build.MANUFACTURER) || "Meta".equalsIgnoreCase(Build.MANUFACTURER);
+        if ("Oculus".equalsIgnoreCase(Build.MANUFACTURER) || "Meta".equalsIgnoreCase(Build.MANUFACTURER)) {
+            return true;
+        }
+        PackageManager pm = getPackageManager();
+        if (!pm.hasSystemFeature("android.hardware.vr.headtracking")) {
+            return false;
+        }
+        return pm.resolveContentProvider("org.khronos.openxr.runtime_broker", 0) != null
+                || pm.resolveContentProvider("org.khronos.openxr.system_runtime_broker", 0) != null;
+    }
+
+    // The phone app couldn't go on (platform/android/PhoneMain.cpp): say why,
+    // instead of a black screen. Close ends the app.
+    public void showError(final String message) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing()) {
+                    return;
+                }
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("VBoy Color stopped")
+                        .setMessage(message + "\n\nPlease report this at github.com/yuk27/VBoyColor/issues, "
+                                + "with your device's name (" + Build.MANUFACTURER + " " + Build.MODEL
+                                + ", Android " + Build.VERSION.RELEASE + ").")
+                        .setCancelable(false)
+                        .setPositiveButton("Close", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                finish();
+                            }
+                        })
+                        .show();
+            }
+        });
     }
 
     // Asks for a kind's folder: the system's picker now, or on a headset the

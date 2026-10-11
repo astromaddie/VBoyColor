@@ -30,6 +30,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <stdexcept>
@@ -59,6 +60,9 @@ namespace
         bool backHeld = false;
         std::map<int32_t, Finger> fingers;
         bool touched = false; // since the last frame
+        // Lets go of the Vulkan surface: called while Android still waits
+        // for the window to be released (APP_CMD_TERM_WINDOW).
+        std::function<void()> releaseWindow;
     };
 
     void CheckVk(VkResult result, const char *what)
@@ -77,6 +81,9 @@ namespace
             state->windowChanged = true;
             break;
         case APP_CMD_TERM_WINDOW:
+            // (the swapchain goes now - the window is only valid until this returns)
+            if (state->releaseWindow)
+                state->releaseWindow();
             state->window = nullptr;
             state->windowChanged = true;
             break;
@@ -231,6 +238,39 @@ namespace
             env->CallVoidMethod(app->activity->clazz, haptic);
     }
 
+    // Something went wrong for good: say so on the screen (MainActivity.showError)
+    // rather than leaving it black.
+    void ShowError(android_app *app, const std::string &message)
+    {
+        LOGE("Phone app: %s", message.c_str());
+        JNIEnv *env = nullptr;
+        app->activity->vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+        jclass activityClass = env->GetObjectClass(app->activity->clazz);
+        jmethodID show = env->GetMethodID(activityClass, "showError", "(Ljava/lang/String;)V");
+        env->DeleteLocalRef(activityClass);
+        if (!show)
+        {
+            env->ExceptionClear();
+            return;
+        }
+        jstring text = env->NewStringUTF(message.c_str());
+        env->CallVoidMethod(app->activity->clazz, show, text);
+        env->DeleteLocalRef(text);
+    }
+
+    // After an error: keep answering Android until the player closes the app
+    // (returning from android_main would leave a frozen black window).
+    void WaitForClose(android_app *app)
+    {
+        while (!app->destroyRequested)
+        {
+            int events = 0;
+            android_poll_source *source = nullptr;
+            if (ALooper_pollAll(-1, nullptr, &events, reinterpret_cast<void **>(&source)) >= 0 && source)
+                source->process(app, source);
+        }
+    }
+
     // The Vulkan side of the window: surface and swapchain, made again
     // whenever Android hands over a new window (back from the background,
     // a rotation).
@@ -357,6 +397,12 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     TouchControls touch;
     Presenter presenter;
     presenter.renderer = &renderer;
+    // What already happened before this function took the events over (the
+    // VR app falls back here when the headset runtime can't start).
+    state.resumed = app->activityState == APP_CMD_RESUME;
+    state.window = app->window;
+    state.windowChanged = app->window != nullptr;
+    state.releaseWindow = [&]() { presenter.Destroy(uiRenderer); };
     bool ready = false; // the device, the renderer, the menu - once
     VkFence acquireFence = VK_NULL_HANDLE;
     bool settingsLoaded = false;
@@ -365,15 +411,20 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     bool menuComboWasHeld = false, backWasHeld = false;
     std::string shownRom;
     auto lastFrameTime = std::chrono::steady_clock::now();
+    bool fatal = false;
 
     for (;;)
     {
+      try
+      {
         // Events: all that are waiting - or, with nothing to show (in the
         // background, no window, the ROMs folder picker up), wait for one.
         bool quit = false;
         for (;;)
         {
-            const bool active = state.resumed && state.window && platform.HasRomsFolder();
+            // (the folder is asked of Android only until the app is up - it's a
+            // system call)
+            const bool active = state.resumed && state.window && (ready || platform.HasRomsFolder());
             int events = 0;
             android_poll_source *source = nullptr;
             if (ALooper_pollAll(active ? 0 : -1, nullptr, &events, reinterpret_cast<void **>(&source)) < 0)
@@ -440,8 +491,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             }
             catch (const std::exception &ex)
             {
-                LOGE("Phone app: %s", ex.what());
-                break;
+                throw std::runtime_error(std::string("Couldn't start: ") + ex.what());
             }
         }
         if (!ready || presenter.swapchain == VK_NULL_HANDLE || !state.resumed)
@@ -555,8 +605,15 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             presenter.CreateSwapchain(uiRenderer, state.window);
             continue;
         }
-        if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
+        if (acquired == VK_ERROR_SURFACE_LOST_KHR)
+        {
+            state.windowChanged = true; // (a new surface for the same window)
             continue;
+        }
+        if (acquired == VK_NOT_READY || acquired == VK_TIMEOUT)
+            continue;
+        if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
+            CheckVk(acquired, "vkAcquireNextImageKHR");
         vkWaitForFences(renderer.GetDevice(), 1, &acquireFence, VK_TRUE, UINT64_MAX);
 
         uiRenderer.BeginFrame(presenter.images[imageIndex], presenter.format.format, presenter.extent.width,
@@ -611,11 +668,30 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &presenter.swapchain;
         presentInfo.pImageIndices = &imageIndex;
+        // (not on VK_SUBOPTIMAL_KHR: Android says that on every frame while the
+        // phone is turned sideways - the picture isn't pre-rotated, the system
+        // turns it - and a new swapchain each frame dropped every picture
+        // before it was shown: a black screen. A new size is caught above.)
         const VkResult presented = vkQueuePresentKHR(renderer.GetQueue(), &presentInfo);
-        if (presented == VK_ERROR_OUT_OF_DATE_KHR || presented == VK_SUBOPTIMAL_KHR)
+        if (presented == VK_ERROR_OUT_OF_DATE_KHR)
             presenter.CreateSwapchain(uiRenderer, state.window);
+      }
+      catch (const std::exception &ex)
+      {
+          ShowError(app, ex.what());
+          fatal = true;
+          break;
+      }
     }
 
+    state.releaseWindow = nullptr;
+    if (fatal)
+    {
+        if (ready)
+            emulator.SaveRamNow();
+        presenter.Destroy(uiRenderer);
+        WaitForClose(app);
+    }
     if (ready)
     {
         vkDeviceWaitIdle(renderer.GetDevice());

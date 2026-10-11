@@ -216,9 +216,10 @@ void EmulatorButtonMapPage::ApplyDefaultMapping(bool overwrite)
         bind(VBButtonBit::Start,      0, DeviceKeyboard, 257); // GLFW_KEY_ENTER
         bind(VBButtonBit::Select,     0, DeviceKeyboard, 259); // GLFW_KEY_BACKSPACE
     }
-    else
+    else if (m_mappingProfile == ButtonMappingProfile::Vr)
     {
         // OpenXR controller layout mirrors the raw states produced by XrInput.
+        // (Not on a phone: its touch controls aren't mapped here.)
         bind(VBButtonBit::LeftUp,     0, DeviceLeftTouch, EmuButton_LeftStickUp);
         bind(VBButtonBit::LeftDown,   0, DeviceLeftTouch, EmuButton_LeftStickDown);
         bind(VBButtonBit::LeftLeft,   0, DeviceLeftTouch, EmuButton_LeftStickLeft);

@@ -224,6 +224,7 @@ void android_main(struct android_app *app)
 
     bool requestRestart = false;
     bool destroyRequested = false;
+    bool flatInstead = false; // no headset runtime after all - the phone app
 
     while (!destroyRequested)
     {
@@ -268,7 +269,10 @@ void android_main(struct android_app *app)
             }
             catch (const std::exception &ex)
             {
-                LOGE("OpenXrApp init failed: %s", ex.what());
+                // Not a headset after all (no OpenXR runtime - a phone that
+                // claims head tracking): the flat app rather than a black screen.
+                LOGE("OpenXrApp init failed: %s - starting the phone app instead", ex.what());
+                flatInstead = true;
                 break;
             }
         }
@@ -293,5 +297,7 @@ void android_main(struct android_app *app)
 
     if (initialized)
         xrApp.Shutdown();
+    if (flatInstead && !app->destroyRequested)
+        RunPhoneApp(app, platform);
     app->activity->vm->DetachCurrentThread();
 }
