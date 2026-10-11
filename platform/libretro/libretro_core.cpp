@@ -406,6 +406,39 @@ namespace
     std::array<ShadeRgb, 5> g_stops{}; // Gradient
     ShadeRgb g_tint{1.0f, 0.0f, 0.0f};
     bool g_gradient = false;
+    uint32_t g_brightness[256]; // Gradient / Tint: the core's brightness -> B, G, R, A
+
+    // Gradient and Tint, for each brightness the core can draw.
+    void BuildBrightnessTable()
+    {
+        for (int v = 0; v < 256; ++v)
+        {
+            const float b = v / 255.0f;
+            float rgb[3];
+            if (g_gradient)
+            {
+                const float scaled = b * 4.0f;
+                const int seg = std::clamp(static_cast<int>(scaled), 0, 3);
+                const float f = scaled - seg;
+                const ShadeRgb &a = g_stops[seg], &c = g_stops[seg + 1];
+                rgb[0] = a.r + (c.r - a.r) * f;
+                rgb[1] = a.g + (c.g - a.g) * f;
+                rgb[2] = a.b + (c.b - a.b) * f;
+            }
+            else
+            {
+                rgb[0] = g_tint.r * b;
+                rgb[1] = g_tint.g * b;
+                rgb[2] = g_tint.b * b;
+            }
+            uint8_t px[4];
+            px[0] = static_cast<uint8_t>(std::lround(std::clamp(rgb[2], 0.0f, 1.0f) * 255.0f));
+            px[1] = static_cast<uint8_t>(std::lround(std::clamp(rgb[1], 0.0f, 1.0f) * 255.0f));
+            px[2] = static_cast<uint8_t>(std::lround(std::clamp(rgb[0], 0.0f, 1.0f) * 255.0f));
+            px[3] = 0xFF;
+            std::memcpy(&g_brightness[v], px, 4);
+        }
+    }
 
     // The frame Beetle VB just drew (both eyes side by side).
     const uint8_t *g_frame = nullptr;
@@ -626,6 +659,8 @@ namespace
             const ColorSchemes::Rgb &c = ColorSchemes::kTints[tint >= 0 ? tint : 0];
             g_tint = ShadeRgb{c.r, c.g, c.b};
         }
+        if (!g_shadeColors)
+            BuildBrightnessTable();
 
         // The tile tracker (the core's record of which tile drew each pixel)
         // runs while the renderer uses it - it costs the core time.
@@ -738,32 +773,9 @@ namespace
         else
         {
             // By brightness (the core draws red: its red is the brightness).
+            uint32_t *out = reinterpret_cast<uint32_t *>(g_colored.data());
             for (size_t i = 0; i < pixels; ++i)
-            {
-                const float b = g_raw[i * 4 + 2] / 255.0f;
-                float rgb[3];
-                if (g_gradient)
-                {
-                    const float scaled = b * 4.0f;
-                    const int seg = std::clamp(static_cast<int>(scaled), 0, 3);
-                    const float f = scaled - seg;
-                    const ShadeRgb &a = g_stops[seg], &c = g_stops[seg + 1];
-                    rgb[0] = a.r + (c.r - a.r) * f;
-                    rgb[1] = a.g + (c.g - a.g) * f;
-                    rgb[2] = a.b + (c.b - a.b) * f;
-                }
-                else
-                {
-                    rgb[0] = g_tint.r * b;
-                    rgb[1] = g_tint.g * b;
-                    rgb[2] = g_tint.b * b;
-                }
-                uint8_t *o = &g_colored[i * 4];
-                o[0] = static_cast<uint8_t>(std::lround(std::clamp(rgb[2], 0.0f, 1.0f) * 255.0f));
-                o[1] = static_cast<uint8_t>(std::lround(std::clamp(rgb[1], 0.0f, 1.0f) * 255.0f));
-                o[2] = static_cast<uint8_t>(std::lround(std::clamp(rgb[0], 0.0f, 1.0f) * 255.0f));
-                o[3] = 0xFF;
-            }
+                out[i] = g_brightness[g_raw[i * 4 + 2]];
         }
 
         // Lay the eyes out.

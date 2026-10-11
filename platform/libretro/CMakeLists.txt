@@ -21,6 +21,11 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
+# The C++ runtime linked into the core (Linux: no libstdc++ version to
+# match). Off for a manylinux build (CI's Linux cores), whose compiler
+# already links what's newer than the old system's libstdc++ in.
+option(VBC_STATIC_RUNTIME "Link the C++ runtime into the core" ON)
+
 get_filename_component(REPO ${CMAKE_CURRENT_SOURCE_DIR}/../.. ABSOLUTE)
 set(VB_CORE_DIR ${REPO}/third_party/beetle-vb-libretro)
 
@@ -105,7 +110,7 @@ if(UNIX AND NOT APPLE)
     # Only retro_* leave the core; no C++ runtime of its own to clash with the frontend's.
     target_link_options(vboycolor_libretro PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/link.T
         -Wl,--no-undefined)
-    if(NOT ANDROID)
+    if(NOT ANDROID AND VBC_STATIC_RUNTIME)
         target_link_options(vboycolor_libretro PRIVATE -static-libgcc -static-libstdc++)
     endif()
     target_link_libraries(vboycolor_libretro PRIVATE m)

@@ -239,10 +239,14 @@ jobs:
         include:
           - platform: windows-x64
             os: windows-2022
+          # (Linux: built in manylinux_2_28 - glibc 2.28 - so the core
+          # loads on older systems too, handheld firmwares among them)
           - platform: linux-x64
             os: ubuntu-22.04
+            image: quay.io/pypa/manylinux_2_28_x86_64
           - platform: linux-arm64
             os: ubuntu-22.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64
           - platform: macos
             os: macos-14
           - platform: android-arm64
@@ -257,7 +261,22 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Build (Linux, in manylinux)
+        if: matrix.image
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD":/src -w /src -e OFFICIAL -e PRERELEASE ${{ matrix.image }} bash -c '
+            set -e
+            export PATH=/opt/python/cp312-cp312/bin:$PATH
+            command -v git > /dev/null || dnf install -y -q git
+            command -v cmake > /dev/null || pip install -q cmake
+            git config --global --add safe.directory /src
+            cmake -S platform/libretro -B build/libretro -DCMAKE_BUILD_TYPE=Release -DVBC_STATIC_RUNTIME=OFF -DVBGO_RELEASE_BUILD=$OFFICIAL -DVBGO_PRERELEASE="${PRERELEASE#*-}"
+            cmake --build build/libretro --parallel
+          ' 2>&1 | tee build.log
+
       - name: Configure
+        if: ${{ !matrix.image }}
         run: |
           set -o pipefail
           extra=()
@@ -266,25 +285,26 @@ jobs:
             macos) extra=(-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15) ;;
             android-arm64) extra=(-DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_LATEST_HOME/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-21) ;;
           esac
-          cmake -S platform/libretro -B build-lr -DCMAKE_BUILD_TYPE=Release "${extra[@]}" -DVBGO_RELEASE_BUILD=$OFFICIAL -DVBGO_PRERELEASE="${PRERELEASE#*-}" 2>&1 | tee build.log
+          cmake -S platform/libretro -B build/libretro -DCMAKE_BUILD_TYPE=Release "${extra[@]}" -DVBGO_RELEASE_BUILD=$OFFICIAL -DVBGO_PRERELEASE="${PRERELEASE#*-}" 2>&1 | tee build.log
 
       - name: Build
+        if: ${{ !matrix.image }}
         run: |
           set -o pipefail
-          cmake --build build-lr --config Release --parallel 2>&1 | tee build.log
+          cmake --build build/libretro --config Release --parallel 2>&1 | tee build.log
 
       - name: Package
         run: |
           set -e
-          version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build-lr/generated/Version.h)
+          version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build/libretro/generated/Version.h)
           dir=vboycolor_libretro-$version-${{ matrix.platform }}
           mkdir -p "$dir"
           case "${{ matrix.platform }}" in
-            windows-x64) cp build-lr/Release/vboycolor_libretro.dll "$dir/" ;;
-            macos) cp build-lr/vboycolor_libretro.dylib "$dir/"; strip -x "$dir/vboycolor_libretro.dylib" ;;
-            android-arm64) cp build-lr/vboycolor_libretro_android.so "$dir/"
+            windows-x64) cp build/libretro/Release/vboycolor_libretro.dll "$dir/" ;;
+            macos) cp build/libretro/vboycolor_libretro.dylib "$dir/"; strip -x "$dir/vboycolor_libretro.dylib" ;;
+            android-arm64) cp build/libretro/vboycolor_libretro_android.so "$dir/"
                            "$ANDROID_NDK_LATEST_HOME"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip "$dir/vboycolor_libretro_android.so" ;;
-            *) cp build-lr/vboycolor_libretro.so "$dir/"; strip "$dir/vboycolor_libretro.so" ;;
+            *) cp build/libretro/vboycolor_libretro.so "$dir/"; strip "$dir/vboycolor_libretro.so" ;;
           esac
           cp platform/libretro/vboycolor_libretro.info "$dir/"
           cp -r LICENSE THIRD-PARTY-NOTICES.md licenses "$dir/"
