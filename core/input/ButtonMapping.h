@@ -86,9 +86,23 @@ namespace ButtonMapper {
     // Gamepad defaults in every Virtual Boy button's second slot (the first
     // holds the platform's own default - controllers or keyboard), only
     // where that slot is unset: left D-pad on the D-pad, right D-pad on the
-    // right stick, A/B on A/B, L/R on the bumpers, Start/Select on
-    // Start/Back. Same on every platform.
-    void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16]);
+    // right stick, L/R on the bumpers, Start/Select on Start/Back. A and B:
+    // byPosition (the window and phone apps) puts them where they sit on the
+    // Virtual Boy's own pad, as other emulators do - A on the right face
+    // button (Xbox B, PlayStation Circle), B on the bottom one (Xbox A,
+    // Cross); otherwise (the VR apps) A on A, B on B.
+    void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16], bool byPosition = false);
+
+    // The window and phone apps' companions, for play only: the left stick
+    // also does what the D-pad is mapped to, the triggers what the bumpers
+    // are (a gamepad bitmask in, the same with those bits added).
+    uint32_t GamepadCompanionBits(uint32_t gamepadBits);
+
+    // The window and phone apps' settings from before by-position A/B
+    // (settings version < 21) still hold the old default (A on A, B on B):
+    // swap those two to the new one, once. Anything else the player mapped
+    // stays.
+    void MigrateGamepadAToPosition(MappedButtons (&vbButtons)[16]);
 
     // gamepad button names; ltouch button names; rtouch button names
     const std::string MapButtonStr[32 * 3] = {

@@ -87,6 +87,8 @@ namespace
         using namespace ButtonMapper;
         uint32_t buttonStates[3] = {0, 0, 0};
         PollDesktopButtonState(window, buttonStates);
+        // (the left stick moves like the D-pad, the triggers press like the bumpers)
+        buttonStates[DeviceGamepad] = GamepadCompanionBits(buttonStates[DeviceGamepad]);
         appMenu.ApplyGameplayInputSuppression(buttonStates);
         uint32_t result = TranslateToVBBitmask(buttonStates, settings.vbButtons);
         // The menu's select/back keys (see PollDesktopButtonState) still read
@@ -148,7 +150,14 @@ namespace
         setDefault(VBButtonBit::R, GLFW_KEY_E);
         setDefault(VBButtonBit::Start, GLFW_KEY_ENTER);
         setDefault(VBButtonBit::Select, GLFW_KEY_BACKSPACE);
-        ApplyDefaultGamepadBindings(settings.vbButtons);
+        // The gamepad as on other emulators: A/B where the Virtual Boy has
+        // them (VBoyColorVR.exe keeps A on A - see ApplyDefaultGamepadBindings).
+        if (!settings.gamepadByPosition)
+        {
+            MigrateGamepadAToPosition(settings.vbButtons);
+            settings.gamepadByPosition = true;
+        }
+        ApplyDefaultGamepadBindings(settings.vbButtons, true);
     }
 
     // Where the game screen goes in a w x h window, the Virtual Boy's shape

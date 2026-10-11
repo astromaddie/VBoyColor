@@ -70,7 +70,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 20;
+    static constexpr int kVersion = 21;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -144,6 +144,11 @@ struct AppSettings
     // Version 20 (appended): look for a new VBoy Color when the app starts
     // (About - see core/io/Updater.h).
     bool checkForUpdates = true;
+
+    // Version 21 (appended): the window and phone apps have put the
+    // gamepad's A/B by position (ButtonMapper::MigrateGamepadAToPosition) -
+    // set once that has run.
+    bool gamepadByPosition = false;
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

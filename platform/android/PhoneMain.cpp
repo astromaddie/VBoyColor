@@ -119,6 +119,10 @@ namespace
             return ButtonMapping[EmuButton_LShoulder];
         case AKEYCODE_BUTTON_R1:
             return ButtonMapping[EmuButton_RShoulder];
+        case AKEYCODE_BUTTON_L2:
+            return ButtonMapping[EmuButton_L2];
+        case AKEYCODE_BUTTON_R2:
+            return ButtonMapping[EmuButton_R2];
         case AKEYCODE_BUTTON_START:
             return ButtonMapping[EmuButton_Enter];
         case AKEYCODE_BUTTON_SELECT:
@@ -220,6 +224,11 @@ namespace
         if (hx > kDeadzone) bits |= ButtonMapping[EmuButton_Right];
         if (hy < -kDeadzone) bits |= ButtonMapping[EmuButton_Up];
         if (hy > kDeadzone) bits |= ButtonMapping[EmuButton_Down];
+        // (triggers: 0 to 1 - some pads report them as brake and gas)
+        if (std::max(axis(AMOTION_EVENT_AXIS_LTRIGGER), axis(AMOTION_EVENT_AXIS_BRAKE)) > kDeadzone)
+            bits |= ButtonMapping[EmuButton_L2];
+        if (std::max(axis(AMOTION_EVENT_AXIS_RTRIGGER), axis(AMOTION_EVENT_AXIS_GAS)) > kDeadzone)
+            bits |= ButtonMapping[EmuButton_R2];
         if (bits)
             state->gamepadUsed = true;
         state->gamepadAxisBits = bits;
@@ -473,7 +482,13 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                         if (!settingsLoaded)
                         {
                             settings.Load(platform);
-                            ButtonMapper::ApplyDefaultGamepadBindings(settings.vbButtons);
+                            // (A/B where the Virtual Boy has them, as on the PC window)
+                            if (!settings.gamepadByPosition)
+                            {
+                                ButtonMapper::MigrateGamepadAToPosition(settings.vbButtons);
+                                settings.gamepadByPosition = true;
+                            }
+                            ButtonMapper::ApplyDefaultGamepadBindings(settings.vbButtons, true);
                             settingsLoaded = true;
                         }
                         uiRenderer.Initialize(renderer.GetDevice(), renderer.GetPhysicalDevice(), renderer.GetQueue(),
@@ -580,7 +595,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         {
             // (only the gamepad's buttons go through the mapping - the other
             // slots are the menu's)
-            uint32_t gameplay[3] = {buttonStates[ButtonMapper::DeviceGamepad], 0, 0};
+            // (the left stick moves like the D-pad, the triggers press like the bumpers)
+            uint32_t gameplay[3] = {ButtonMapper::GamepadCompanionBits(buttonStates[ButtonMapper::DeviceGamepad]), 0, 0};
             appMenu.ApplyGameplayInputSuppression(gameplay);
             emulator.SetGameplayInput(ButtonMapper::TranslateToVBBitmask(gameplay, settings.vbButtons) | touchBits);
             emulator.RunFrame(deltaSeconds);

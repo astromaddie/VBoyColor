@@ -69,6 +69,11 @@ namespace
             axis(GLFW_GAMEPAD_AXIS_LEFT_Y, EmuButton_LeftStickUp, EmuButton_LeftStickDown);
             axis(GLFW_GAMEPAD_AXIS_RIGHT_X, EmuButton_RightStickLeft, EmuButton_RightStickRight);
             axis(GLFW_GAMEPAD_AXIS_RIGHT_Y, EmuButton_RightStickUp, EmuButton_RightStickDown);
+            // (triggers rest at -1: pressed from half way)
+            if (pad.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER] > 0.0f)
+                out.bits |= ButtonMapping[EmuButton_L2];
+            if (pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER] > 0.0f)
+                out.bits |= ButtonMapping[EmuButton_R2];
             if (pad.buttons[GLFW_GAMEPAD_BUTTON_GUIDE] == GLFW_PRESS ||
                 (pad.buttons[GLFW_GAMEPAD_BUTTON_BACK] == GLFW_PRESS && pad.buttons[GLFW_GAMEPAD_BUTTON_START] == GLFW_PRESS))
                 out.menu = true;
@@ -154,6 +159,10 @@ namespace
             axis(pad.sThumbLY, EmuButton_LeftStickDown, EmuButton_LeftStickUp);
             axis(pad.sThumbRX, EmuButton_RightStickLeft, EmuButton_RightStickRight);
             axis(pad.sThumbRY, EmuButton_RightStickDown, EmuButton_RightStickUp);
+            if (pad.bLeftTrigger > 127)
+                out.bits |= ButtonMapping[EmuButton_L2];
+            if (pad.bRightTrigger > 127)
+                out.bits |= ButtonMapping[EmuButton_R2];
             if ((pad.wButtons & 0x0400) ||
                 ((pad.wButtons & XINPUT_GAMEPAD_BACK) && (pad.wButtons & XINPUT_GAMEPAD_START)))
                 out.menu = true;

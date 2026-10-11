@@ -157,14 +157,16 @@ second. In the menu: sticks / D-pad / arrow keys move, A (Enter) picks, B
 Quest controllers' lasers work too: a quick trigger press clicks, holding the
 trigger and moving drags (scrolls lists and the library).
 
-| Virtual Boy | Quest controllers | Keyboard | Gamepad (PC) |
+| Virtual Boy | Quest controllers | Keyboard | Gamepad |
 |---|---|---|---|
-| Left D-pad | left stick | arrow keys | D-pad |
+| Left D-pad | left stick | arrow keys | D-pad or left stick |
 | Right D-pad | right stick | W A S D | right stick |
-| A / B | A / B | X / Z | A / B |
-| L / R | left / right trigger | Q / E | LB / RB |
-| Start / Select | Y / X | Enter / Backspace | Start / Back |
+| A / B | A / B | X / Z | B / A - where the Virtual Boy has them (right and bottom face buttons) |
+| L / R | left / right trigger | Q / E | LB / RB (or LT / RT) |
+| Start / Select | Y / X | Enter / Backspace | Start / Back (View) |
 
+The gamepad column is the PC window's and the phone's. With a gamepad in VR
+(VBoyColorVR.exe, or a pad paired with the Quest), A is on A and B on B.
 Everything can be remapped in Settings → Button mapping. On PC,
 **Alt+Enter** toggles fullscreen.
 

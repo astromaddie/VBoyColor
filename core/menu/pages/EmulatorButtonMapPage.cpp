@@ -71,6 +71,26 @@ std::string BindingStr(const ButtonMapper::MappedButton &b, ButtonMappingProfile
             return "Key " + std::to_string(b.ButtonIndex);
         }
     }
+    if (b.InputDevice == ButtonMapper::DeviceGamepad)
+    {
+        // A gamepad's buttons as printed on an Xbox pad.
+        using namespace ButtonMapper;
+        switch (static_cast<uint32_t>(b.ButtonIndex))
+        {
+        case EmuButton_Up: return "D-pad Up";
+        case EmuButton_Down: return "D-pad Down";
+        case EmuButton_Left: return "D-pad Left";
+        case EmuButton_Right: return "D-pad Right";
+        case EmuButton_LShoulder: return "LB";
+        case EmuButton_RShoulder: return "RB";
+        case EmuButton_L2: return "LT";
+        case EmuButton_R2: return "RT";
+        case EmuButton_Enter: return "Start";
+        case EmuButton_LThumb: return "Left stick click";
+        case EmuButton_RThumb: return "Right stick click";
+        default: break;
+        }
+    }
     return ButtonMapper::MapButtonStr[b.InputDevice * 32 + b.ButtonIndex];
 }
 } // namespace
@@ -182,21 +202,9 @@ void EmulatorButtonMapPage::ApplyDefaultMapping(bool overwrite)
             binding = {true, device, static_cast<int>(button)};
     };
 
-    // Slot 1 is the conventional gamepad layout on every platform.
-    bind(VBButtonBit::A,          1, DeviceGamepad, EmuButton_A);
-    bind(VBButtonBit::B,          1, DeviceGamepad, EmuButton_B);
-    bind(VBButtonBit::L,          1, DeviceGamepad, EmuButton_LShoulder);
-    bind(VBButtonBit::R,          1, DeviceGamepad, EmuButton_RShoulder);
-    bind(VBButtonBit::LeftUp,     1, DeviceGamepad, EmuButton_Up);
-    bind(VBButtonBit::LeftDown,   1, DeviceGamepad, EmuButton_Down);
-    bind(VBButtonBit::LeftLeft,   1, DeviceGamepad, EmuButton_Left);
-    bind(VBButtonBit::LeftRight,  1, DeviceGamepad, EmuButton_Right);
-    bind(VBButtonBit::RightUp,    1, DeviceGamepad, EmuButton_RightStickUp);
-    bind(VBButtonBit::RightDown,  1, DeviceGamepad, EmuButton_RightStickDown);
-    bind(VBButtonBit::RightLeft,  1, DeviceGamepad, EmuButton_RightStickLeft);
-    bind(VBButtonBit::RightRight, 1, DeviceGamepad, EmuButton_RightStickRight);
-    bind(VBButtonBit::Start,      1, DeviceGamepad, EmuButton_Enter);
-    bind(VBButtonBit::Select,     1, DeviceGamepad, EmuButton_Back);
+    // Slot 1 is the gamepad: A/B by position in the window and phone apps,
+    // by label in VR (see ButtonMapper::ApplyDefaultGamepadBindings).
+    ApplyDefaultGamepadBindings(m_settings->vbButtons, m_mappingProfile != ButtonMappingProfile::Vr);
 
     if (m_mappingProfile == ButtonMappingProfile::Desktop)
     {

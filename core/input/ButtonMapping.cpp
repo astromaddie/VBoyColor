@@ -26,7 +26,7 @@ uint32_t TranslateToVBBitmask(const uint32_t buttonStates[3], const MappedButton
     return vbBits;
 }
 
-void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16])
+void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16], bool byPosition)
 {
     auto setDefault = [&](uint32_t vbBit, uint32_t emuButton)
     {
@@ -46,12 +46,40 @@ void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16])
     setDefault(VBButtonBit::RightDown, EmuButton_RightStickDown);
     setDefault(VBButtonBit::RightLeft, EmuButton_RightStickLeft);
     setDefault(VBButtonBit::RightRight, EmuButton_RightStickRight);
-    setDefault(VBButtonBit::A, EmuButton_A);
-    setDefault(VBButtonBit::B, EmuButton_B);
+    setDefault(VBButtonBit::A, byPosition ? EmuButton_B : EmuButton_A);
+    setDefault(VBButtonBit::B, byPosition ? EmuButton_A : EmuButton_B);
     setDefault(VBButtonBit::L, EmuButton_LShoulder);
     setDefault(VBButtonBit::R, EmuButton_RShoulder);
     setDefault(VBButtonBit::Start, EmuButton_Enter);
     setDefault(VBButtonBit::Select, EmuButton_Back);
+}
+
+uint32_t GamepadCompanionBits(uint32_t bits)
+{
+    auto also = [&bits](uint32_t from, uint32_t to)
+    {
+        if (bits & ButtonMapping[from])
+            bits |= ButtonMapping[to];
+    };
+    also(EmuButton_LeftStickUp, EmuButton_Up);
+    also(EmuButton_LeftStickDown, EmuButton_Down);
+    also(EmuButton_LeftStickLeft, EmuButton_Left);
+    also(EmuButton_LeftStickRight, EmuButton_Right);
+    also(EmuButton_L2, EmuButton_LShoulder);
+    also(EmuButton_R2, EmuButton_RShoulder);
+    return bits;
+}
+
+void MigrateGamepadAToPosition(MappedButtons (&vbButtons)[16])
+{
+    MappedButton &a = vbButtons[VBButtonBit::A].Buttons[1], &b = vbButtons[VBButtonBit::B].Buttons[1];
+    const bool oldDefault = a.IsSet && b.IsSet && a.InputDevice == DeviceGamepad && b.InputDevice == DeviceGamepad &&
+                            a.ButtonIndex == static_cast<int>(EmuButton_A) && b.ButtonIndex == static_cast<int>(EmuButton_B);
+    if (oldDefault)
+    {
+        a.ButtonIndex = static_cast<int>(EmuButton_B);
+        b.ButtonIndex = static_cast<int>(EmuButton_A);
+    }
 }
 
 } // namespace ButtonMapper

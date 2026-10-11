@@ -18,7 +18,8 @@ namespace
     // prefix of today's layout - copying just that much keeps everything the
     // user had set up (button mapping, screen placement, palette) and leaves
     // the newer fields at their defaults. 18 has 17's layout (only the
-    // screen look's default changed); 19 appended screen3D, 20 checkForUpdates.
+    // screen look's default changed); 19 appended screen3D, 20 checkForUpdates,
+    // 21 gamepadByPosition.
     size_t PrefixCompatibleSize(int version)
     {
         switch (version)
@@ -40,6 +41,8 @@ namespace
             return offsetof(AppSettings, screen3D);
         case 19:
             return offsetof(AppSettings, checkForUpdates);
+        case 20:
+            return offsetof(AppSettings, gamepadByPosition);
         default:
             return 0;
         }
