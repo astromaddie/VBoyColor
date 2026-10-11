@@ -72,7 +72,7 @@ endif()
 FetchContent_Declare(
     OpenXR-SDK
     GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
-    GIT_TAG release-1.1.42
+    GIT_TAG release-1.1.63 # (1.0.63+: Quest 3 offers apps 100Hz - OpenXrApp::RequestMaxDisplayRefreshRate)
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(OpenXR-SDK)

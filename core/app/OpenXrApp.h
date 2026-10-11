@@ -73,9 +73,9 @@ private:
     // (full-rect submission) instead of allocated once at the max tier.
     void EnsureMenuSwapchain();
     void UpdateMenuRenderScale();
-    // Asks the runtime for its highest display refresh rate (VB judder is
-    // finest there - see the definition's doc comment). No-op without
-    // XR_FB_display_refresh_rate (e.g. SteamVR).
+    // Asks the runtime for 100Hz (two refreshes per VB frame) if offered,
+    // else its highest rate up to 120Hz - see the definition's doc comment.
+    // No-op without XR_FB_display_refresh_rate (e.g. SteamVR).
     void RequestMaxDisplayRefreshRate();
     void HandleSessionStateChanged(const XrEventDataSessionStateChanged &event, bool &exitRenderLoop, bool &requestRestart);
     // Polls the device battery level into m_appMenu's header indicator, at

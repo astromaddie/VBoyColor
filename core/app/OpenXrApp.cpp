@@ -472,14 +472,19 @@ void OpenXrApp::UpdateMenuRenderScale()
     }
 }
 
-// Preferred: the highest rate that's a near-integer multiple of the VB's
-// 50.27Hz (within 0.5%) - VB frames then hold a constant number of vsyncs,
-// i.e. perfectly even pacing. No current Quest rate (72/80/90/120) comes
-// close, so in practice the fallback applies: the highest offered rate,
-// where the unavoidable mixed-vsync holds are shortest (72Hz alternates
-// 1/2-vsync holds, visible judder; 120Hz alternates 2/3 at 8.3ms each) and
-// tracking latency is lowest. Best-effort: no-op where the extension is
-// missing (SteamVR) or the request fails.
+// The VB shows 50.27 frames a second. A display rate that's a near multiple
+// of it - 100Hz: every VB frame held for exactly two refreshes - scrolls
+// evenly; at the others (72/80/90/120Hz) frames are held for a mixed number
+// of refreshes (120Hz: 2 and 3 in turn), which judders. So 100Hz when the
+// headset offers it (Quest 2, 3 and 3S do - Quest 3 only to apps built
+// against OpenXR 1.0.63 or newer, hence CMakeLists' SDK version); being
+// 0.54% under 2 x 50.27, a VB frame is skipped once every ~3.7s instead (the
+// emulation keeps the VB's own speed, so the sound stays in step).
+// Otherwise the highest rate, where the mixed holds are shortest and head
+// tracking is quickest. Never above 120Hz: Quest 3's extended rates (144 to
+// 207Hz) would cost far more power and heat than they're worth here.
+// Best-effort: no-op where the extension is missing (SteamVR) or the request
+// fails.
 void OpenXrApp::RequestMaxDisplayRefreshRate()
 {
     if (!m_refreshRateExtAvailable)
@@ -501,20 +506,24 @@ void OpenXrApp::RequestMaxDisplayRefreshRate()
     if (XR_FAILED(pfnEnumerateRates(m_session, rateCount, &rateCount, rates.data())))
         return;
 
+    constexpr float kMaxRate = 120.5f;
     float bestAny = 0.0f;
     float bestMultiple = 0.0f;
     for (const float rate : rates)
     {
+        if (rate > kMaxRate)
+            continue;
         bestAny = std::max(bestAny, rate);
+        // (within 1.5%: 100Hz is 1.07% under 2 x 50.27)
         const float ratio = rate / Emulator::kCoreFps;
-        if (ratio >= 0.995f && std::abs(ratio - std::round(ratio)) <= 0.005f * ratio)
+        if (ratio >= 1.5f && std::abs(ratio - std::round(ratio)) <= 0.015f * ratio)
             bestMultiple = std::max(bestMultiple, rate);
     }
     const float best = bestMultiple > 0.0f ? bestMultiple : bestAny;
 
     if (best > 0.0f && XR_SUCCEEDED(pfnRequestRate(m_session, best)))
         std::fprintf(stderr, "[OpenXR] Requested display refresh rate: %.0f Hz%s\n", best,
-                     bestMultiple > 0.0f ? " (VB frame-locked)" : "");
+                     bestMultiple > 0.0f ? " (a multiple of the VB's 50.27Hz)" : "");
 }
 
 void OpenXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChanged &event, bool &exitRenderLoop,
