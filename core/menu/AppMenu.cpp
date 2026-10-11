@@ -872,8 +872,8 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
     }
 
     // The pages.
-    static constexpr const char *kNames[SidebarCount] = {"Library", "Resume", "Save states", "Settings", "About"};
-    static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::RomList, UiIconId::Resume, UiIconId::SaveSlot,
+    static constexpr const char *kNames[SidebarCount] = {"Resume", "Library", "Save states", "Settings", "About"};
+    static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::Resume, UiIconId::RomList, UiIconId::SaveSlot,
                                                       UiIconId::Settings, UiIconId::Header};
     const int active = TargetPage() ? TargetPage()->sidebarItem : -1;
     for (int i = 0; i < SidebarCount; ++i)

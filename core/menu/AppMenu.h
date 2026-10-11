@@ -44,10 +44,11 @@ public:
     static constexpr float kTransitionSpeed = 0.15f;
     static constexpr float kOpenCloseSpeed = 0.15f;
 
+    // (in the order they're listed: back to the game first)
     enum SidebarItem
     {
-        SidebarLibrary,
         SidebarResume,
+        SidebarLibrary,
         SidebarSaveStates,
         SidebarSettings,
         SidebarAbout,

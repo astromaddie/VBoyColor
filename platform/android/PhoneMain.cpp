@@ -388,6 +388,23 @@ namespace
         x = areaX + std::floor((w - sw) / 2.0f);
         y = areaY + std::floor((h - sh) / 2.0f);
     }
+
+    // With no game loaded, the screen round the menu is the Virtual Boy's
+    // red (the logo's "VBOY" red) - as if looking into one, the menu its
+    // screen, set in the red with a soft shadow round it (shadow: 0-1, the
+    // menu's fade).
+    void DrawVirtualBoyRed(UiRenderer &ui, float w, float h, float menuX, float menuY, float menuW, float menuH,
+                           float menuScale, float shadow)
+    {
+        ui.DrawQuad(0.0f, 0.0f, w, h, {205.0f / 255.0f, 37.0f / 255.0f, 57.0f / 255.0f, 1.0f});
+        constexpr int kLayers = 10;
+        for (int i = kLayers; i >= 1; --i)
+        {
+            const float grow = i * 1.6f * menuScale;
+            ui.DrawQuadRounded(menuX - grow, menuY - grow, menuW + 2.0f * grow, menuH + 2.0f * grow,
+                               {0.0f, 0.0f, 0.0f, 0.07f * shadow}, AppMenu::kPanelCornerRadiusPx * menuScale + grow);
+        }
+    }
 } // namespace
 
 void RunPhoneApp(android_app *app, AndroidPlatform &platform)
@@ -691,7 +708,12 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
 
         uiRenderer.BeginFrame(presenter.images[imageIndex], presenter.format.format, presenter.extent.width,
                               presenter.extent.height, appMenu.GetBackgroundColor());
-        if (emulator.HasScreen())
+        // No game: the Virtual Boy's red round the menu (not the empty screen).
+        const bool vbRed = !editing && !emulator.HasGame() && appMenu.IsVisible();
+        if (vbRed)
+            DrawVirtualBoyRed(uiRenderer, w, h, menuX, menuY, kMenuWidth * menuScale, kMenuHeight * menuScale, menuScale,
+                              appMenu.GetVisibility());
+        else if (emulator.HasScreen())
         {
             float ax = 0, ay = 0, aw = 0, ah = 0;
             touch.ScreenArea(ax, ay, aw, ah);
