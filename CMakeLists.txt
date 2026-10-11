@@ -335,6 +335,7 @@ if(ANDROID)
 else()
     add_executable(VBoyColorVR
         platform/pc/Main.cpp
+        platform/desktop/DesktopGamepad.cpp
     )
     target_link_libraries(VBoyColorVR PRIVATE vbgo_app)
     if(WIN32)
@@ -393,9 +394,12 @@ else()
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(glfw)
+    # (the VR app reads gamepads through GLFW's joystick API - no window)
+    target_link_libraries(VBoyColorVR PRIVATE glfw)
 
     add_executable(VBoyColor
         platform/pc2d/Main.cpp
+        platform/desktop/DesktopGamepad.cpp
     )
     target_link_libraries(VBoyColor PRIVATE vbgo_app glfw)
     if(MSVC)

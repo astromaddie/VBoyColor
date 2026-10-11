@@ -4,7 +4,11 @@
 // Rework-branch session notes for why (VD/SteamVR both stream a runtime's
 // compositor output directly; a mirror window is a later nice-to-have).
 #include "app/OpenXrApp.h"
+#include "desktop/DesktopGamepad.h"
 #include "desktop/DesktopPlatform.h"
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include <chrono>
 #include <cstdio>
@@ -32,6 +36,12 @@ int main()
     exitPollingThread.detach();
 
     std::printf("VBoy Color VR starting...\n");
+
+    // Gamepads (an Xbox pad and the like) - GLFW's joystick API, no window:
+    // what the Quest app gets from Android's input events.
+    const bool gamepads = glfwInit() == GLFW_TRUE;
+    if (!gamepads)
+        std::fprintf(stderr, "VBoy Color VR: no gamepad support (glfwInit failed)\n");
 
     // Its own settings file: the flat VBoyColor.exe uses the same States
     // folder, with keys where this app has Touch controller inputs.
@@ -66,6 +76,13 @@ int main()
 
             if (app.IsSessionRunning())
             {
+                if (gamepads)
+                {
+                    glfwPollEvents(); // (pads plugged in or out)
+                    const DesktopGamepad pad = PollDesktopGamepads();
+                    app.SetGamepadButtonState(pad.bits);
+                    app.SetGamepadMenuButtonPressed(pad.menu);
+                }
                 app.RenderFrame();
             }
             else
@@ -82,6 +99,8 @@ int main()
     }
 
     app.Shutdown();
+    if (gamepads)
+        glfwTerminate();
     std::printf("VBoy Color VR exiting\n");
     if (platform.RestartRequested())
         platform.Relaunch(); // (an update - see Updater)

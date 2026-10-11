@@ -11,6 +11,7 @@
 #include "menu/AppMenu.h"
 #include "input/ButtonMapping.h"
 #include "gfx/UiRenderer.h"
+#include "desktop/DesktopGamepad.h"
 #include "desktop/DesktopPlatform.h"
 #include "input/TouchControls.h"
 
@@ -67,45 +68,7 @@ namespace
         menuKey(GLFW_KEY_W, EmuButton_Y); // (the library's list/cards switch)
         menuKey(GLFW_KEY_D, EmuButton_X);
 
-        GLFWgamepadstate pad{};
-        if (glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &pad))
-        {
-            uint32_t &bits = buttonStates[DeviceGamepad];
-            auto button = [&](int glfwButton, uint32_t emuButton)
-            {
-                if (pad.buttons[glfwButton] == GLFW_PRESS)
-                    bits |= ButtonMapping[emuButton];
-            };
-            button(GLFW_GAMEPAD_BUTTON_A, EmuButton_A);
-            button(GLFW_GAMEPAD_BUTTON_B, EmuButton_B);
-            button(GLFW_GAMEPAD_BUTTON_X, EmuButton_X);
-            button(GLFW_GAMEPAD_BUTTON_Y, EmuButton_Y);
-            button(GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, EmuButton_LShoulder);
-            button(GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER, EmuButton_RShoulder);
-            button(GLFW_GAMEPAD_BUTTON_BACK, EmuButton_Back);
-            button(GLFW_GAMEPAD_BUTTON_START, EmuButton_Enter);
-            button(GLFW_GAMEPAD_BUTTON_DPAD_UP, EmuButton_Up);
-            button(GLFW_GAMEPAD_BUTTON_DPAD_DOWN, EmuButton_Down);
-            button(GLFW_GAMEPAD_BUTTON_DPAD_LEFT, EmuButton_Left);
-            button(GLFW_GAMEPAD_BUTTON_DPAD_RIGHT, EmuButton_Right);
-            constexpr float deadzone = 0.5f;
-            if (pad.axes[GLFW_GAMEPAD_AXIS_LEFT_X] < -deadzone)
-                bits |= ButtonMapping[EmuButton_LeftStickLeft];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_LEFT_X] > deadzone)
-                bits |= ButtonMapping[EmuButton_LeftStickRight];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] < -deadzone)
-                bits |= ButtonMapping[EmuButton_LeftStickUp];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] > deadzone)
-                bits |= ButtonMapping[EmuButton_LeftStickDown];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] < -deadzone)
-                bits |= ButtonMapping[EmuButton_RightStickLeft];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] > deadzone)
-                bits |= ButtonMapping[EmuButton_RightStickRight];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] < -deadzone)
-                bits |= ButtonMapping[EmuButton_RightStickUp];
-            if (pad.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] > deadzone)
-                bits |= ButtonMapping[EmuButton_RightStickDown];
-        }
+        buttonStates[DeviceGamepad] |= PollDesktopGamepads().bits;
     }
 
     // VB gameplay input - separate key layout from menu navigation (the VB
@@ -650,11 +613,7 @@ int main(int argc, char **argv)
 
             // (a gamepad's Guide button or Back + Start together too, as on the
             // Quest - not the left stick click, which happens while playing)
-            GLFWgamepadstate menuPad{};
-            const bool padMenu = glfwJoystickIsGamepad(GLFW_JOYSTICK_1) && glfwGetGamepadState(GLFW_JOYSTICK_1, &menuPad) &&
-                                 (menuPad.buttons[GLFW_GAMEPAD_BUTTON_GUIDE] == GLFW_PRESS ||
-                                  (menuPad.buttons[GLFW_GAMEPAD_BUTTON_BACK] == GLFW_PRESS &&
-                                   menuPad.buttons[GLFW_GAMEPAD_BUTTON_START] == GLFW_PRESS));
+            const bool padMenu = PollDesktopGamepads().menu;
             const bool tabPressed = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS || padMenu;
             if (tabPressed && !tabWasPressed)
                 appMenu.ToggleOpen();
