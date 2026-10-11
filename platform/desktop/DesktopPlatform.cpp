@@ -9,6 +9,8 @@
 #endif
 #include <windows.h>
 #include <winhttp.h>
+#else
+#include <unistd.h> // (web requests: the POST body's temporary file)
 #endif
 
 #include <algorithm>
@@ -573,7 +575,178 @@ namespace
         return pclose(pipe) == 0 && !out.empty() && out.size() <= kMaxDownloadBytes;
     }
 #endif
+
+    // A web request (RetroAchievements): GET, or POST with a body, with the
+    // given User-Agent; whatever the status, its body comes back. False: no
+    // connection (or a reply too big).
+#if defined(_WIN32)
+    bool HttpCall(const Platform::HttpRequest &call, int &status, std::vector<uint8_t> &out)
+    {
+        const std::wstring wideUrl(call.url.begin(), call.url.end()); // (ASCII - rcheevos percent-encodes)
+        wchar_t host[256] = {}, path[2048] = {}, extra[2048] = {};
+        URL_COMPONENTS parts{};
+        parts.dwStructSize = sizeof(parts);
+        parts.lpszHostName = host;
+        parts.dwHostNameLength = static_cast<DWORD>(sizeof(host) / sizeof(host[0]));
+        parts.lpszUrlPath = path;
+        parts.dwUrlPathLength = static_cast<DWORD>(sizeof(path) / sizeof(path[0]));
+        parts.lpszExtraInfo = extra; // (the query, "?...")
+        parts.dwExtraInfoLength = static_cast<DWORD>(sizeof(extra) / sizeof(extra[0]));
+        if (!WinHttpCrackUrl(wideUrl.c_str(), 0, 0, &parts))
+            return false;
+        const std::wstring object = std::wstring(path) + extra;
+
+        const std::wstring agent(call.userAgent.begin(), call.userAgent.end());
+        HINTERNET session = WinHttpOpen(agent.empty() ? L"VBoyColor" : agent.c_str(), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                        WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (!session)
+            return false;
+        WinHttpSetTimeouts(session, 10000, 10000, 30000, 30000);
+        const bool post = !call.postData.empty();
+        HINTERNET connection = WinHttpConnect(session, host, parts.nPort, 0);
+        HINTERNET request = connection ? WinHttpOpenRequest(connection, post ? L"POST" : L"GET", object.c_str(), nullptr,
+                                                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                            parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0)
+                                       : nullptr;
+        std::wstring headers;
+        if (post && !call.contentType.empty())
+            headers = L"Content-Type: " + std::wstring(call.contentType.begin(), call.contentType.end()) + L"\r\n";
+        const DWORD bodySize = static_cast<DWORD>(call.postData.size());
+        bool ok = request &&
+                  WinHttpSendRequest(request, headers.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : headers.c_str(),
+                                     headers.empty() ? 0 : static_cast<DWORD>(-1L),
+                                     post ? const_cast<char *>(call.postData.data()) : WINHTTP_NO_REQUEST_DATA, bodySize,
+                                     bodySize, 0) &&
+                  WinHttpReceiveResponse(request, nullptr);
+        if (ok)
+        {
+            DWORD code = 0, size = sizeof(code);
+            ok = WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
+                                     &code, &size, WINHTTP_NO_HEADER_INDEX) != FALSE;
+            status = static_cast<int>(code);
+        }
+        while (ok)
+        {
+            DWORD available = 0;
+            if (!WinHttpQueryDataAvailable(request, &available))
+                ok = false;
+            if (!ok || available == 0)
+                break;
+            const size_t at = out.size();
+            out.resize(at + available);
+            DWORD read = 0;
+            if (!WinHttpReadData(request, out.data() + at, available, &read))
+                ok = false;
+            out.resize(at + read);
+            if (out.size() > kMaxDownloadBytes)
+                ok = false;
+        }
+        if (request)
+            WinHttpCloseHandle(request);
+        if (connection)
+            WinHttpCloseHandle(connection);
+        WinHttpCloseHandle(session);
+        return ok;
+    }
+#else
+    // curl, the HTTP status appended to what it prints (-w); a POST's body
+    // from a file only this user can read (a login's carries the password -
+    // never on a command line).
+    bool HttpCall(const Platform::HttpRequest &call, int &status, std::vector<uint8_t> &out)
+    {
+        auto quotable = [](const std::string &text) { return text.find('\'') == std::string::npos; };
+        if (!quotable(call.url) || !quotable(call.userAgent) || !quotable(call.contentType))
+            return false;
+        std::string command = "curl -sL --max-time 30 -w '\\n%{http_code}'";
+        if (!call.userAgent.empty())
+            command += " -A '" + call.userAgent + "'";
+        char bodyFile[] = "/tmp/vboycolor-http-XXXXXX";
+        int fd = -1;
+        if (!call.postData.empty())
+        {
+            fd = mkstemp(bodyFile); // (mode 0600)
+            if (fd < 0)
+                return false;
+            const bool written = write(fd, call.postData.data(), call.postData.size()) ==
+                                 static_cast<ssize_t>(call.postData.size());
+            close(fd);
+            if (!written)
+            {
+                unlink(bodyFile);
+                return false;
+            }
+            if (!call.contentType.empty())
+                command += " -H 'Content-Type: " + call.contentType + "'";
+            command += std::string(" --data-binary @") + bodyFile;
+        }
+        command += " '" + call.url + "'";
+        FILE *pipe = popen(command.c_str(), "r");
+        if (pipe)
+        {
+            uint8_t buffer[16384];
+            size_t read = 0;
+            while ((read = std::fread(buffer, 1, sizeof(buffer), pipe)) > 0 && out.size() <= kMaxDownloadBytes)
+                out.insert(out.end(), buffer, buffer + read);
+            pclose(pipe);
+        }
+        if (fd >= 0)
+            unlink(bodyFile);
+        // The last line is the status ("000": no connection).
+        const auto newline = std::find(out.rbegin(), out.rend(), static_cast<uint8_t>('\n'));
+        if (!pipe || newline == out.rend() || out.size() > kMaxDownloadBytes)
+            return false;
+        const size_t at = static_cast<size_t>(out.rend() - newline) - 1;
+        status = std::atoi(std::string(out.begin() + at + 1, out.end()).c_str());
+        out.resize(at);
+        return status > 0;
+    }
+#endif
 } // namespace
+
+struct DesktopPlatform::Call
+{
+    std::mutex mutex;
+    bool done = false;
+    int status = -1;
+    std::vector<uint8_t> body;
+};
+
+int DesktopPlatform::StartHttpRequest(const HttpRequest &request)
+{
+    const int id = ++m_nextCallId;
+    auto call = std::make_shared<Call>();
+    m_calls[id] = call;
+    // Detached, like the downloads: it only touches its own Call.
+    std::thread([call, request]()
+                {
+                    int status = -1;
+                    std::vector<uint8_t> body;
+                    if (!HttpCall(request, status, body))
+                        status = -1;
+                    std::lock_guard<std::mutex> lock(call->mutex);
+                    call->status = status;
+                    call->body = std::move(body);
+                    call->done = true;
+                })
+        .detach();
+    return id;
+}
+
+int DesktopPlatform::PollHttpRequest(int id, int &status, std::vector<uint8_t> &body)
+{
+    const auto it = m_calls.find(id);
+    if (it == m_calls.end())
+        return -1;
+    {
+        std::lock_guard<std::mutex> lock(it->second->mutex);
+        if (!it->second->done)
+            return 0;
+        status = it->second->status;
+        body = std::move(it->second->body);
+    }
+    m_calls.erase(it);
+    return 1;
+}
 
 struct DesktopPlatform::Download
 {

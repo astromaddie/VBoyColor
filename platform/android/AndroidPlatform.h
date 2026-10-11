@@ -3,6 +3,7 @@
 #include "io/Platform.h"
 
 #include <jni.h>
+#include <set>
 
 struct AAssetManager;
 
@@ -42,6 +43,9 @@ public:
     // MainActivity's download thread (startDownload/pollDownload/takeDownload).
     bool StartDownload(const std::string &url, int slot = kDownloadBoxArt) override;
     int PollDownload(std::vector<uint8_t> &bytes, int slot = kDownloadBoxArt) override;
+    // MainActivity's web requests (startHttp/pollHttp/takeHttp).
+    int StartHttpRequest(const HttpRequest &request) override;
+    int PollHttpRequest(int id, int &status, std::vector<uint8_t> &body) override;
 
     // Updates: the APK to the system's installer (MainActivity.installUpdate).
     const char *UpdatePackage() const override { return "android"; }
@@ -63,5 +67,7 @@ private:
 
     JavaVM *m_vm = nullptr;
     jobject m_activity = nullptr; // global ref, set once by the constructor
+    std::set<int> m_httpIds;      // web requests still to be reported
+    int m_nextHttpId = 0;
     AAssetManager *m_assetManager = nullptr;
 };

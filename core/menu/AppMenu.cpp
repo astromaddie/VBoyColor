@@ -54,6 +54,8 @@ namespace
     constexpr float kNavPitch = 20.0f;
     constexpr float kNavSubtitleExtra = 7.0f; // (Resume shows the game under it)
     constexpr float kNavIconSize = 10.0f;
+    // A notice over the game (an achievement unlocked), in the menu's logical units.
+    constexpr float kNoticeWidth = 236.0f, kNoticeHeight = 40.0f;
 
     // The fonts (see AppMenuLayout.h): which resource, bold, size.
     struct FontSpec
@@ -202,6 +204,8 @@ void AppMenu::Initialize(UiRenderer &ui, VkFormat targetFormat, Emulator &emulat
     // logical layout numbers are.
     m_offscreenTexture = ui.CreateRenderTexture(static_cast<uint32_t>(kMenuWidth * m_menuScale),
                                                 static_cast<uint32_t>(kMenuHeight * m_menuScale), targetFormat);
+    m_noticeTexture = ui.CreateRenderTexture(static_cast<uint32_t>(kNoticeWidth * m_menuScale),
+                                             static_cast<uint32_t>(kNoticeHeight * m_menuScale), targetFormat);
 
     InitPages(ui);
 
@@ -231,6 +235,8 @@ void AppMenu::SetMenuScale(UiRenderer &ui, float scale)
 
     ui.ResizeRenderTexture(m_offscreenTexture, static_cast<uint32_t>(kMenuWidth * m_menuScale),
                            static_cast<uint32_t>(kMenuHeight * m_menuScale));
+    ui.ResizeRenderTexture(m_noticeTexture, static_cast<uint32_t>(kNoticeWidth * m_menuScale),
+                           static_cast<uint32_t>(kNoticeHeight * m_menuScale));
     LoadFonts(ui, true);
     LoadLogo(ui); // (in case it didn't load the first time)
     RebuildLogo(ui);
@@ -316,7 +322,7 @@ void AppMenu::RebuildLogo(UiRenderer &ui)
 void AppMenu::InitPages(UiRenderer &ui)
 {
     MenuPage *pages[] = {&m_libraryPage, &m_saveStatesPage, &m_settingsPage, &m_emulatorButtonMapPage, &m_moveScreenPage,
-                         &m_folderPage, &m_gameControlsPage, &m_aboutPage};
+                         &m_folderPage, &m_gameControlsPage, &m_aboutPage, &m_achievementsPage, &m_textInputPage};
     for (MenuPage *page : pages)
     {
         page->Navigate = [this](MenuPage *target, int dir) { StartTransition(target, dir); };
@@ -331,6 +337,8 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_folderPage.sidebarItem = SidebarSettings;
     m_gameControlsPage.sidebarItem = SidebarLibrary;
     m_aboutPage.sidebarItem = SidebarAbout;
+    m_achievementsPage.sidebarItem = SidebarAchievements;
+    m_textInputPage.sidebarItem = SidebarAchievements;
 
     // Cross-page links
     m_settingsPage.emulatorButtonMapPage = &m_emulatorButtonMapPage;
@@ -342,6 +350,7 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_gameControlsPage.libraryPage = &m_libraryPage;
     m_gameControlsPage.buttonMapPage = &m_emulatorButtonMapPage;
     m_folderPage.settingsPage = &m_settingsPage;
+    m_achievementsPage.textInput = &m_textInputPage;
     // A kind's folder changed: the games folder's games, and the settings
     // written where they now live.
     m_folderPage.onChanged = [this](DataKind kind)
@@ -359,7 +368,8 @@ void AppMenu::InitPages(UiRenderer &ui)
     }
     // The sidebar's own pages: B goes back to the game (or the sidebar).
     for (MenuPage *page : {static_cast<MenuPage *>(&m_libraryPage), static_cast<MenuPage *>(&m_saveStatesPage),
-                           static_cast<MenuPage *>(&m_settingsPage), static_cast<MenuPage *>(&m_aboutPage)})
+                           static_cast<MenuPage *>(&m_achievementsPage), static_cast<MenuPage *>(&m_settingsPage),
+                           static_cast<MenuPage *>(&m_aboutPage)})
         page->SetBackPress([this]() { BackFromPage(); });
 }
 
@@ -374,6 +384,8 @@ MenuPage *AppMenu::PageFor(int item)
         return &m_libraryPage;
     case SidebarSaveStates:
         return &m_saveStatesPage;
+    case SidebarAchievements:
+        return &m_achievementsPage;
     case SidebarSettings:
         return &m_settingsPage;
     case SidebarAbout:
@@ -678,6 +690,11 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
     // Thumbnails are made while the menu is open (the game paused).
     m_thumbnails.Update(m_open);
 
+    // RetroAchievements: its web requests, and its notices over the game.
+    if (m_resources.emulator)
+        m_resources.emulator->GetAchievements().Update(deltaSeconds, !m_open && m_resources.emulator->HasGame());
+    UpdateNotice(deltaSeconds);
+
     // A newer VBoy Color: one look a few seconds in (a development build
     // only when asked - see Updater).
     m_updater.Update();
@@ -795,7 +812,8 @@ std::vector<MenuHint> AppMenu::CurrentHints() const
         return {};
     std::vector<MenuHint> hints = page->Hints();
     // On the sidebar's own pages B goes back to the game.
-    const bool topLevel = page == &m_libraryPage || page == &m_saveStatesPage || page == &m_settingsPage || page == &m_aboutPage;
+    const bool topLevel = page == &m_libraryPage || page == &m_saveStatesPage || page == &m_achievementsPage ||
+                          page == &m_settingsPage || page == &m_aboutPage;
     for (MenuHint &hint : hints)
         if (hint.icon == UiIconId::ButtonB && topLevel && game)
             hint.label = "Resume";
@@ -872,9 +890,10 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
     }
 
     // The pages.
-    static constexpr const char *kNames[SidebarCount] = {"Resume", "Library", "Save states", "Settings", "About"};
+    static constexpr const char *kNames[SidebarCount] = {"Resume", "Library", "Save states", "Achievements", "Settings",
+                                                         "About"};
     static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::Resume, UiIconId::RomList, UiIconId::SaveSlot,
-                                                      UiIconId::Settings, UiIconId::Header};
+                                                      UiIconId::Trophy, UiIconId::Settings, UiIconId::Header};
     const int active = TargetPage() ? TargetPage()->sidebarItem : -1;
     for (int i = 0; i < SidebarCount; ++i)
     {
@@ -963,13 +982,20 @@ void AppMenu::RenderContent(UiRenderer &ui)
 
 void AppMenu::RenderToBuffer(UiRenderer &ui)
 {
-    ui.BeginOffscreenFrame(m_offscreenTexture, XrColor4f{0.0f, 0.0f, 0.0f, 0.0f}, kMenuWidth, kMenuHeight);
-    RenderContent(ui);
-    ui.EndFrame();
+    if (IsVisible())
+    {
+        ui.BeginOffscreenFrame(m_offscreenTexture, XrColor4f{0.0f, 0.0f, 0.0f, 0.0f}, kMenuWidth, kMenuHeight);
+        RenderContent(ui);
+        ui.EndFrame();
+    }
+    if (NoticeShowing())
+        RenderNotice(ui);
 }
 
 void AppMenu::Draw(UiRenderer &ui, float x, float y, float squeezeX, float squeezeY)
 {
+    if (NoticeShowing())
+        DrawNotice(ui, x, y, squeezeX, squeezeY);
     if (m_visibility <= 0.0f)
         return; // fully closed - nothing to composite
 
@@ -993,4 +1019,116 @@ void AppMenu::Draw(UiRenderer &ui, float x, float y, float squeezeX, float squee
     ui.DrawImageRounded(m_offscreenTexture, x + (fullW - w) / 2.0f * squeezeX, y + (fullH - h) / 2.0f * squeezeY,
                         w * squeezeX, h * squeezeY, kPanelCornerRadiusPx * m_menuScale * std::min(squeezeX, squeezeY),
                         eased);
+}
+
+// -----------------------------------------------------------------------
+// Notices over the game (RetroAchievements' - see Achievements::TakeNotice):
+// one at a time, at the top of where the menu would be; they wait while the
+// menu is open.
+
+void AppMenu::UpdateNotice(float deltaSeconds)
+{
+    if (!m_resources.emulator || !m_ui)
+        return;
+    if (!m_notice.active)
+    {
+        Achievements::Notice notice;
+        if (!m_resources.emulator->GetAchievements().TakeNotice(notice))
+            return;
+        m_notice.active = true;
+        m_notice.notice = std::move(notice);
+        m_notice.age = 0.0f;
+        // (glyphs baked now, outside any frame)
+        m_ui->EnsureGlyphsForText(m_resources.captionBoldFont, m_notice.notice.caption);
+        m_ui->EnsureGlyphsForText(m_resources.bodyBoldFont, m_notice.notice.title + "\xE2\x80\xA6");
+        m_ui->EnsureGlyphsForText(m_resources.captionFont, m_notice.notice.text + "\xE2\x80\xA6");
+        return;
+    }
+    if (IsVisible())
+        return; // (waits for the game)
+    m_notice.age += deltaSeconds;
+    if (m_notice.age >= m_notice.notice.seconds)
+        m_notice.active = false;
+}
+
+void AppMenu::RenderNotice(UiRenderer &ui)
+{
+    const Achievements::Notice &n = m_notice.notice;
+    ui.BeginOffscreenFrame(m_noticeTexture, XrColor4f{0.0f, 0.0f, 0.0f, 0.0f}, kNoticeWidth, kNoticeHeight);
+    ui.DrawQuadRounded(0.0f, 0.0f, kNoticeWidth, kNoticeHeight, {0.09f, 0.095f, 0.13f, 0.96f}, 8.0f);
+    ui.DrawQuadRounded(0.6f, 0.6f, kNoticeWidth - 1.2f, kNoticeHeight - 1.2f, {1.0f, 0.79f, 0.34f, 0.10f}, 7.4f);
+    // The badge (or a trophy while it's on its way).
+    constexpr float kBadge = 28.0f, kPad = 6.0f;
+    const Achievements *achievements = m_resources.emulator ? &m_resources.emulator->GetAchievements() : nullptr;
+    float u0, v0, u1, v1;
+    if (achievements && achievements->BadgeUv(n.badge, u0, v0, u1, v1))
+        ui.DrawImageRegion(achievements->BadgeAtlas(), kPad, kPad, kBadge, kBadge, u0, v0, u1, v1);
+    else
+    {
+        ui.DrawQuadRounded(kPad, kPad, kBadge, kBadge, {0.2f, 0.215f, 0.28f, 1.0f}, 4.0f);
+        m_icons.Draw(ui, UiIconId::Trophy, kPad + 7.0f, kPad + 7.0f, kBadge - 14.0f, 1.0f, kMenuSelectionColor);
+    }
+    const float textX = kPad + kBadge + 7.0f, room = kNoticeWidth - textX - kPad;
+    auto fit = [&](UiFontHandle font, const std::string &text)
+    {
+        if (ui.GetTextWidth(font, text) <= room)
+            return text;
+        std::string cut = text;
+        while (!cut.empty() && ui.GetTextWidth(font, cut + "\xE2\x80\xA6") > room)
+        {
+            cut.pop_back();
+            while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80)
+                cut.pop_back();
+            if (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0xC0)
+                cut.pop_back();
+        }
+        return cut + "\xE2\x80\xA6";
+    };
+    ui.DrawText(m_resources.captionBoldFont, fit(m_resources.captionBoldFont, n.caption), textX,
+                TextY(ui, m_resources.captionBoldFont, 10.0f), 1.0f, kMenuSelectionColor);
+    ui.DrawText(m_resources.bodyBoldFont, fit(m_resources.bodyBoldFont, n.title), textX,
+                TextY(ui, m_resources.bodyBoldFont, 20.5f), 1.0f, {1.0f, 1.0f, 1.0f, 1.0f});
+    ui.DrawText(m_resources.captionFont, fit(m_resources.captionFont, n.text), textX, TextY(ui, m_resources.captionFont, 31.0f),
+                1.0f, kMenuTextColor);
+    ui.EndFrame();
+}
+
+void AppMenu::DrawNotice(UiRenderer &ui, float x, float y, float squeezeX, float squeezeY)
+{
+    // Slides down and fades in, fades out at the end.
+    const float age = m_notice.age, left = m_notice.notice.seconds - age;
+    const float in = std::min(1.0f, age / 0.25f), out = std::min(1.0f, left / 0.4f);
+    const float alpha = std::max(0.0f, std::min(in, out));
+    const float slide = (1.0f - std::sin(in * 1.5707963f)) * -8.0f;
+    const float w = kNoticeWidth * m_menuScale, h = kNoticeHeight * m_menuScale;
+    const float nx = x + (kMenuWidth * m_menuScale - w) / 2.0f * squeezeX;
+    const float ny = y + (6.0f + slide) * m_menuScale * squeezeY;
+    ui.DrawImageRounded(m_noticeTexture, nx, ny, w * squeezeX, h * squeezeY, 8.0f * m_menuScale * std::min(squeezeX, squeezeY),
+                        alpha);
+}
+
+// -----------------------------------------------------------------------
+// Typing on a real keyboard
+
+bool AppMenu::WantsText() const
+{
+    return m_open && !m_sidebarFocus && TargetPage() == &m_textInputPage;
+}
+
+void AppMenu::TypeText(const std::string &utf8)
+{
+    if (WantsText())
+        m_textInputPage.TypeText(utf8);
+}
+
+void AppMenu::TypeBackspace()
+{
+    if (WantsText())
+        m_textInputPage.TypeBackspace();
+}
+
+void AppMenu::TypeEnter()
+{
+    if (WantsText())
+        m_textInputPage.TypeEnter();
 }

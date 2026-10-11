@@ -3,6 +3,7 @@
 #include <android/asset_manager.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <unistd.h>
 
@@ -286,6 +287,64 @@ int AndroidPlatform::PollDownload(std::vector<uint8_t> &bytes, int slot)
         }
         else
             state = -1;
+    }
+    env->DeleteLocalRef(activityClass);
+    return state;
+}
+
+int AndroidPlatform::StartHttpRequest(const HttpRequest &request)
+{
+    JNIEnv *env = Env();
+    const int id = ++m_nextHttpId;
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID start = env->GetMethodID(activityClass, "startHttp",
+                                       "(ILjava/lang/String;[BLjava/lang/String;Ljava/lang/String;)V");
+    jstring url = env->NewStringUTF(request.url.c_str());
+    jstring contentType = env->NewStringUTF(request.contentType.c_str());
+    jstring userAgent = env->NewStringUTF(request.userAgent.c_str());
+    jbyteArray post = nullptr;
+    if (!request.postData.empty())
+    {
+        post = env->NewByteArray(static_cast<jsize>(request.postData.size()));
+        env->SetByteArrayRegion(post, 0, static_cast<jsize>(request.postData.size()),
+                                reinterpret_cast<const jbyte *>(request.postData.data()));
+    }
+    env->CallVoidMethod(m_activity, start, static_cast<jint>(id), url, post, contentType, userAgent);
+    if (post)
+        env->DeleteLocalRef(post);
+    env->DeleteLocalRef(url);
+    env->DeleteLocalRef(contentType);
+    env->DeleteLocalRef(userAgent);
+    env->DeleteLocalRef(activityClass);
+    m_httpIds.insert(id);
+    return id;
+}
+
+int AndroidPlatform::PollHttpRequest(int id, int &status, std::vector<uint8_t> &body)
+{
+    if (m_httpIds.count(id) == 0)
+        return -1;
+    JNIEnv *env = Env();
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID poll = env->GetMethodID(activityClass, "pollHttp", "(I)I");
+    const jint result = env->CallIntMethod(m_activity, poll, static_cast<jint>(id));
+    int state = 0;
+    if (result != INT32_MIN)
+    {
+        jmethodID take = env->GetMethodID(activityClass, "takeHttp", "(I)[B");
+        auto array = static_cast<jbyteArray>(env->CallObjectMethod(m_activity, take, static_cast<jint>(id)));
+        body.clear();
+        if (array)
+        {
+            const jsize length = env->GetArrayLength(array);
+            body.resize(static_cast<size_t>(length));
+            if (length > 0)
+                env->GetByteArrayRegion(array, 0, length, reinterpret_cast<jbyte *>(body.data()));
+            env->DeleteLocalRef(array);
+        }
+        status = static_cast<int>(result);
+        m_httpIds.erase(id);
+        state = 1;
     }
     env->DeleteLocalRef(activityClass);
     return state;

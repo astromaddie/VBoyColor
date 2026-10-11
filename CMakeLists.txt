@@ -92,6 +92,32 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(freetype)
 
+# RetroAchievements (core/achievements): rcheevos' client, the server's API,
+# the achievements' rules and its MD5. It has no CMake build of its own (its
+# sources are listed here), so FetchContent only fetches it.
+FetchContent_Declare(
+    rcheevos
+    GIT_REPOSITORY https://github.com/RetroAchievements/rcheevos.git
+    GIT_TAG v12.5.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(rcheevos)
+file(GLOB RCHEEVOS_RULE_SOURCES ${rcheevos_SOURCE_DIR}/src/rcheevos/*.c ${rcheevos_SOURCE_DIR}/src/rapi/*.c)
+add_library(rcheevos STATIC
+    ${RCHEEVOS_RULE_SOURCES}
+    ${rcheevos_SOURCE_DIR}/src/rc_client.c
+    ${rcheevos_SOURCE_DIR}/src/rc_compat.c
+    ${rcheevos_SOURCE_DIR}/src/rc_util.c
+    ${rcheevos_SOURCE_DIR}/src/rc_version.c
+    ${rcheevos_SOURCE_DIR}/src/rhash/md5.c
+)
+target_include_directories(rcheevos PUBLIC ${rcheevos_SOURCE_DIR}/include ${rcheevos_SOURCE_DIR}/src/rhash
+                                    PRIVATE ${rcheevos_SOURCE_DIR}/src)
+if(MSVC)
+    target_compile_definitions(rcheevos PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+set_target_properties(rcheevos PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # --------------------------------------------------------------------------
 # Shader compilation: GLSL -> SPIR-V via glslang's C++ API, driven by a tiny
 # build-time compiler tool (no system glslc/glslangValidator needed).
@@ -279,9 +305,12 @@ add_library(vbgo_app STATIC
     core/io/DataFolders.cpp
     core/io/Updater.cpp
     core/input/TouchControls.cpp
+    core/achievements/Achievements.cpp
+    core/menu/pages/AchievementsPage.cpp
+    core/menu/pages/TextInputPage.cpp
 )
 target_include_directories(vbgo_app PUBLIC core ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/platform)
-target_link_libraries(vbgo_app PUBLIC openxr_loader volk freetype vb_core)
+target_link_libraries(vbgo_app PUBLIC openxr_loader volk freetype vb_core rcheevos)
 target_compile_definitions(vbgo_app PUBLIC XR_USE_GRAPHICS_API_VULKAN)
 if(NOT ANDROID)
     add_dependencies(vbgo_app vbgo_shaders)

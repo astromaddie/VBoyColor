@@ -59,6 +59,7 @@ ICONS = [
     ("MapSelect", "icons/mapping/select.dds"),
     ("MapTriggerLeft", "icons/mapping/trigger_left.dds"),
     ("MapTriggerRight", "icons/mapping/trigger_right.dds"),
+    ("Trophy", "trophy_icon.dds"),  # (Achievements)
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

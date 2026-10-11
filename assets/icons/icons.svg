@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="400" height="250" viewBox="0 0 400 250" version="1.1">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="400" height="300" viewBox="0 0 400 300" version="1.1">
   <sodipodi:namedview id="icon-sheet-view" pagecolor="#20242a" bordercolor="#666666" borderopacity="1.0" inkscape:pageopacity="0.0" />
   <defs id="defs3713">
     <marker inkscape:stockid="DotL" orient="auto" refY="0.0" refX="0.0" id="DotL" style="overflow:visible" inkscape:isstock="true">
@@ -286,5 +286,14 @@
   <rect id="icon-frame-curved-screen" data-icon-path="curved_screen_icon.png" x="350" y="200" width="50" height="50" style="fill:#000000;fill-opacity:0;stroke:none" />
   <g id="art-curved-screen">
     <path style="fill:none;stroke:#ffffff;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round" d="M 357,214.5 Q 375,208.5 393,214.5 L 393,235.5 Q 375,229.5 357,235.5 Z" id="curved-screen-part-1" />
+  </g>
+  <rect id="icon-frame-trophy" data-icon-path="trophy_icon.png" x="0" y="250" width="50" height="50" style="fill:#000000;fill-opacity:0;stroke:none" />
+  <g id="art-trophy">
+    <polygon points="14,258 36,258 36,265 35,270.5 32.5,275 28.5,278.5 21.5,278.5 17.5,275 15,270.5 14,265" style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    <polyline points="14.5,261 8.5,261 8.5,266 11,270.5 16,273.5" style="fill:none;stroke:#ffffff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round" />
+    <polyline points="35.5,261 41.5,261 41.5,266 39,270.5 34,273.5" style="fill:none;stroke:#ffffff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round" />
+    <rect x="22.5" y="278" width="5" height="7" style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    <rect x="17.5" y="284.5" width="15" height="3.5" style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    <rect x="14.5" y="288" width="21" height="4" style="fill:#ffffff;fill-opacity:1;stroke:none" />
   </g>
 </svg>

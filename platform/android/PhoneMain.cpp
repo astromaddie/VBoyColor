@@ -667,7 +667,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         for (auto it = state.fingers.begin(); it != state.fingers.end();)
             it = it->second.up ? state.fingers.erase(it) : std::next(it);
 
-        if (appMenu.IsVisible())
+        if (appMenu.NeedsDraw())
             appMenu.RenderToBuffer(uiRenderer);
         vbFrameAlpha = !editing && !emulator.HasGame() ? 1.0f : std::min(vbFrameAlpha, appMenu.GetVisibility());
         if (vbFrameAlpha > 0.0f)
@@ -756,7 +756,11 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                 touch.DrawResume(uiRenderer);
         }
         else
+        {
             touch.Draw(uiRenderer);
+            if (appMenu.NoticeShowing()) // (an achievement unlocked, over the game)
+                appMenu.Draw(uiRenderer, menuX, menuY);
+        }
         uiRenderer.EndFrame();
 
         VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};

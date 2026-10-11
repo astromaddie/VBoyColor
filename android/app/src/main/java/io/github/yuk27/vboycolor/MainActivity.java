@@ -737,6 +737,89 @@ public class MainActivity extends NativeActivity {
         }
     }
 
+    // ---- Web requests (RetroAchievements - core/achievements): any number at
+    // once, each on a thread of its own, GET or POST with a body; native code
+    // polls (AndroidPlatform::PollHttpRequest). Whatever the status, the
+    // reply's body comes back. ----
+
+    private final Object httpLock = new Object();
+    private final java.util.HashMap<Integer, Integer> httpStatus = new java.util.HashMap<Integer, Integer>();
+    private final java.util.HashMap<Integer, byte[]> httpBodies = new java.util.HashMap<Integer, byte[]>();
+
+    public void startHttp(final int id, final String url, final byte[] post, final String contentType,
+                          final String userAgent) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runHttp(id, url, post, contentType, userAgent);
+            }
+        }).start();
+    }
+
+    private void runHttp(int id, String url, byte[] post, String contentType, String userAgent) {
+        int status = -1;
+        byte[] body = new byte[0];
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(30000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("User-Agent", userAgent);
+            if (post != null && post.length > 0) {
+                connection.setRequestMethod("POST");
+                connection.setDoOutput(true);
+                if (contentType != null && !contentType.isEmpty()) {
+                    connection.setRequestProperty("Content-Type", contentType);
+                }
+                connection.setFixedLengthStreamingMode(post.length);
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(post);
+                }
+            }
+            status = connection.getResponseCode();
+            InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            if (stream != null) {
+                try (InputStream in = stream) {
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[65536];
+                    int read;
+                    while ((read = in.read(buffer)) > 0 && out.size() <= MAX_DOWNLOAD_BYTES) {
+                        out.write(buffer, 0, read);
+                    }
+                    body = out.toByteArray();
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "web request failed: " + url, e);
+            status = -1;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+        synchronized (httpLock) {
+            httpBodies.put(id, body);
+            httpStatus.put(id, status);
+        }
+    }
+
+    // Integer.MIN_VALUE while running; then the HTTP status (-1: no connection) - and takeHttp.
+    public int pollHttp(int id) {
+        synchronized (httpLock) {
+            Integer status = httpStatus.get(id);
+            return status == null ? Integer.MIN_VALUE : status;
+        }
+    }
+
+    public byte[] takeHttp(int id) {
+        synchronized (httpLock) {
+            httpStatus.remove(id);
+            byte[] body = httpBodies.remove(id);
+            return body != null ? body : new byte[0];
+        }
+    }
+
     // ---- Updates (core/io/Updater.h): a new APK to the system's installer.
     // On a headset that waits for the app's next start (the installer would
     // take VR focus - see requestPickRomsFolder). The phone must allow VBoy

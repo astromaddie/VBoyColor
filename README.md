@@ -87,6 +87,16 @@ pack).*
   and both eyes always show the same colors. The display runs at the
   headset's highest refresh rate, so scrolling stays smooth.
 - **Save states** - several slots per game, with thumbnails in color.
+- **RetroAchievements** - log in with your
+  [RetroAchievements](https://retroachievements.org) account (Achievements in
+  the menu: an on-screen keyboard types your name and password - or a real
+  keyboard on PC) and earn each game's achievements as you play. An unlock
+  pops up over the game; the Achievements page lists the game's
+  achievements with their badges, unlocked and still to get. Softcore: save
+  states and everything else stay on (a save state keeps the achievements'
+  progress too). Only the login token the site hands back is kept, in the
+  settings folder - never your password. A game needs the ROM version
+  RetroAchievements lists (the usual No-Intro dump).
 - **Gamepads everywhere** - in the PC window, in PC VR and on Android, with
   the usual emulator layout (the Virtual Boy's A and B where they are on its
   controller: right and bottom); every pad connected works, and pads plugged
@@ -232,6 +242,9 @@ Other components and fonts are listed in
 - **[Red Viper](https://github.com/skyfloogle/red-viper)** - the Virtual Boy
   emulator for the 3DS, for the idea of coloring the four shades (its
   multicolour mode). No Red Viper code is used.
+- **[RetroAchievements](https://retroachievements.org)** and its
+  [rcheevos](https://github.com/RetroAchievements/rcheevos) library (MIT) -
+  the achievements, made by its community for every Virtual Boy game it covers.
 - **[Super Bit Shader](https://github.com/AshleyPikachu/Super-Bit-Shader)** by
   Ashley the Pikachu - RetroArch shaders that color the Virtual Boy, the Game
   Boy and the other monochrome handhelds, with side-by-side 3D for the

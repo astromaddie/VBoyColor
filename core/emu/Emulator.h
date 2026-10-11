@@ -1,5 +1,6 @@
 #pragma once
 
+#include "achievements/Achievements.h"
 #include "emu/AudioOutput.h"
 #include "emu/ColorPackRenderer.h"
 #include "emu/FrameRecorder.h"
@@ -363,6 +364,10 @@ public:
     // one made for this ROM (by its CRC) under another name. Empty if none.
     static std::vector<uint8_t> FindPackBytes(Platform &platform, const std::string &name, uint32_t crc, uint32_t size);
 
+    // RetroAchievements (see Achievements.h): the game's achievements follow
+    // what's loaded, played, reset and restored here.
+    Achievements &GetAchievements() { return m_achievements; }
+
     // Flushes cart SRAM for the currently-loaded ROM, if any, and stops
     // audio playback - call once on app exit (LoadRom already flushes SRAM
     // on every ROM switch).
@@ -428,6 +433,8 @@ private:
 
     UiRenderer *m_ui = nullptr;
     Platform *m_platform = nullptr;
+    // (declared before the worker's members: destroyed after the worker stops)
+    Achievements m_achievements;
     UiImageHandle m_screenTexture;
     // PrepareScreen's colored picture (kFbWidth x kFbHeight, the picture in
     // its top-left like m_screenTexture) and what it was made from.

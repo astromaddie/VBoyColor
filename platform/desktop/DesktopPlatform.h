@@ -2,6 +2,7 @@
 
 #include "io/Platform.h"
 
+#include <map>
 #include <memory>
 
 // Platform implementation for Windows/desktop (both platform/pc/'s OpenXR
@@ -48,6 +49,9 @@ public:
     // On a thread of its own: WinHTTP on Windows, curl elsewhere.
     bool StartDownload(const std::string &url, int slot = kDownloadBoxArt) override;
     int PollDownload(std::vector<uint8_t> &bytes, int slot = kDownloadBoxArt) override;
+    // The same, for web requests (POST too) - any number at once.
+    int StartHttpRequest(const HttpRequest &request) override;
+    int PollHttpRequest(int id, int &status, std::vector<uint8_t> &body) override;
 
     // Updates (DesktopUpdate.cpp): the release's .zip (Windows) or .tar.gz
     // (Linux) unpacked over the app's folder - the games folder (roms/) left
@@ -78,4 +82,7 @@ private:
     std::string m_folders[kDataKindCount];   // chosen ones, "" = default
     struct Download;
     std::shared_ptr<Download> m_download[2]; // per slot (shared with its thread)
+    struct Call;
+    std::map<int, std::shared_ptr<Call>> m_calls; // web requests by id (each shared with its thread)
+    int m_nextCallId = 0;
 };

@@ -309,6 +309,18 @@ public:
         bool tintIconOnSelect = false; // per-entry override when the list disables tint
         bool reserveIconSpace = false; // align text with icon rows without drawing an icon
 
+        // Its label dim (a locked achievement, a note) unless highlighted.
+        bool dim = false;
+        // A taller row than the list's own (0: the list's row height) - for a
+        // picture and two lines of text.
+        float rowHeight = 0;
+        // A second, smaller line under the label (dim), wrapped to the row's
+        // width (two lines at most, then "...") - set with SetSubtitle.
+        std::string subtitle;
+        // A picture where the icon goes, square, as tall as the row allows
+        // (e.g. an achievement's badge): drawn at x, y, size.
+        std::function<void(UiRenderer &ui, float x, float y, float size, float alpha)> leftDraw;
+
         // Sets the (primary) label and bakes any glyphs it needs. Prefer this
         // over assigning text directly for anything but pure ASCII (always
         // pre-baked) - see UiFontManager::EnsureGlyphsForText. Call outside a
@@ -316,6 +328,7 @@ public:
         void SetText(const std::string &newText);
         void SetValue(const std::string &newValue);
         void SetCaption(const std::string &newCaption);
+        void SetSubtitle(const std::string &newSubtitle);
         // Second-column label for a twoColumn row (same baking rules).
         void SetSecondaryText(const std::string &newText);
 
@@ -346,6 +359,13 @@ public:
     // of the rows' own callbacks).
     void Clear();
 
+    // The highlighted row's index (among every entry) - and putting the
+    // highlight back there after a rebuild (the nearest row, if that one isn't).
+    int SelectedIndex() const { return m_selectedIndex; }
+    // The rows' subtitles' font (the headers' until set).
+    void SetSubtitleFont(UiFontHandle font) { m_subtitleFont = font; }
+    void SelectNear(int index);
+
     // Which column (0 or 1) is highlighted on the current two-column row -
     // read by a twoColumn entry's pressFunction to know which slot to act on.
     int GetActiveColumn() const { return m_activeColumn; }
@@ -368,11 +388,12 @@ private:
     // Lays the entries out (top of each, from the list's top) - cheap,
     // done whenever needed.
     void Layout() const;
+    float RowHeight(int index) const;
     void ScrollToSelection(bool instant);
     float ContentHeight() const;
 
     UiRenderer *m_ui;
-    UiFontHandle m_font, m_boldFont, m_headerFont;
+    UiFontHandle m_font, m_boldFont, m_headerFont, m_subtitleFont;
     const UiIconSet *m_icons;
     float m_posX, m_posY, m_width, m_height;
     float m_itemHeight;

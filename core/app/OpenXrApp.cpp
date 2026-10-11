@@ -759,7 +759,8 @@ bool OpenXrApp::RenderScreenLayer(XrCompositionLayerQuad &leftQuadLayer, XrCompo
 
 bool OpenXrApp::RenderMenuLayer(XrCompositionLayerQuad &quadLayer)
 {
-    if (!m_appMenu.IsVisible())
+    // (the menu - or, while it's closed, a notice over the game: an achievement unlocked)
+    if (!m_appMenu.NeedsDraw())
     {
         return false;
     }

@@ -43,6 +43,8 @@ namespace
         }
     }
 
+    bool g_typing = false; // a text field takes the keyboard (see OnChar)
+
     void PollDesktopButtonState(GLFWwindow *window, uint32_t buttonStates[3])
     {
         using namespace ButtonMapper;
@@ -59,14 +61,17 @@ namespace
         menuKey(GLFW_KEY_DOWN, EmuButton_Down);
         menuKey(GLFW_KEY_LEFT, EmuButton_Left);
         menuKey(GLFW_KEY_RIGHT, EmuButton_Right);
-        menuKey(GLFW_KEY_S, EmuButton_A);
-        menuKey(GLFW_KEY_A, EmuButton_B);
-        if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) != GLFW_PRESS && glfwGetKey(window, GLFW_KEY_RIGHT_ALT) != GLFW_PRESS)
-            menuKey(GLFW_KEY_ENTER, EmuButton_A); // (Alt+Enter: fullscreen)
         menuKey(GLFW_KEY_ESCAPE, EmuButton_B);
-        menuKey(GLFW_KEY_BACKSPACE, EmuButton_B);
-        menuKey(GLFW_KEY_W, EmuButton_Y); // (the library's list/cards switch)
-        menuKey(GLFW_KEY_D, EmuButton_X);
+        if (!g_typing) // (typing: those keys type - see OnChar)
+        {
+            menuKey(GLFW_KEY_S, EmuButton_A);
+            menuKey(GLFW_KEY_A, EmuButton_B);
+            if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) != GLFW_PRESS && glfwGetKey(window, GLFW_KEY_RIGHT_ALT) != GLFW_PRESS)
+                menuKey(GLFW_KEY_ENTER, EmuButton_A); // (Alt+Enter: fullscreen)
+            menuKey(GLFW_KEY_BACKSPACE, EmuButton_B);
+            menuKey(GLFW_KEY_W, EmuButton_Y); // (the library's list/cards switch)
+            menuKey(GLFW_KEY_D, EmuButton_X);
+        }
 
         buttonStates[DeviceGamepad] |= PollDesktopGamepads().bits;
     }
@@ -221,6 +226,47 @@ namespace
     // Mouse wheel since last frame (the menu scrolls with it).
     double g_scrollY = 0.0;
     void OnScroll(GLFWwindow *, double, double yoffset) { g_scrollY += yoffset; }
+
+    // Typing into a text field (AppMenu::WantsText - a RetroAchievements
+    // login): the characters typed this frame (UTF-8), and Backspace/Enter
+    // presses (the keyboard's repeat too). The keys the menu otherwise uses
+    // (S, A, W, D, Backspace, Enter) don't steer it meanwhile.
+    std::string g_typed;
+    int g_typedBackspaces = 0, g_typedEnters = 0;
+    void OnChar(GLFWwindow *, unsigned int cp)
+    {
+        if (cp < 0x20 || cp == 0x7F)
+            return;
+        if (cp < 0x80)
+            g_typed += static_cast<char>(cp);
+        else if (cp < 0x800)
+        {
+            g_typed += static_cast<char>(0xC0 | (cp >> 6));
+            g_typed += static_cast<char>(0x80 | (cp & 0x3F));
+        }
+        else if (cp < 0x10000)
+        {
+            g_typed += static_cast<char>(0xE0 | (cp >> 12));
+            g_typed += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+            g_typed += static_cast<char>(0x80 | (cp & 0x3F));
+        }
+        else
+        {
+            g_typed += static_cast<char>(0xF0 | (cp >> 18));
+            g_typed += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+            g_typed += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+            g_typed += static_cast<char>(0x80 | (cp & 0x3F));
+        }
+    }
+    void OnKey(GLFWwindow *, int key, int, int action, int)
+    {
+        if (action != GLFW_PRESS && action != GLFW_REPEAT)
+            return;
+        if (key == GLFW_KEY_BACKSPACE)
+            ++g_typedBackspaces;
+        else if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER)
+            ++g_typedEnters;
+    }
 
     // F5: the left eye's picture (as normal), both eyes side by side, or the
     // right eye's - for checking how the two differ (e.g. with a Look).
@@ -400,6 +446,8 @@ int main(int argc, char **argv)
     }
     glfwSetDropCallback(window, OnDrop);
     glfwSetScrollCallback(window, OnScroll);
+    glfwSetCharCallback(window, OnChar);
+    glfwSetKeyCallback(window, OnKey);
     // (a click or key press shorter than a frame - or made while a frame
     // took long, e.g. while recording - still reads as pressed once)
     glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
@@ -778,6 +826,20 @@ int main(int argc, char **argv)
                 g_scrollY = 0.0;
             }
 
+            // Typed text to a text field (else dropped).
+            if (g_typing)
+            {
+                if (!g_typed.empty())
+                    appMenu.TypeText(g_typed);
+                for (int i = 0; i < g_typedBackspaces; ++i)
+                    appMenu.TypeBackspace();
+                if (g_typedEnters > 0)
+                    appMenu.TypeEnter();
+            }
+            g_typed.clear();
+            g_typedBackspaces = g_typedEnters = 0;
+            g_typing = appMenu.WantsText();
+
             std::memcpy(lastButtonStates, buttonStates, sizeof(buttonStates));
             PollDesktopButtonState(window, buttonStates);
             const bool menuWasOpen = appMenu.IsOpen();
@@ -824,7 +886,7 @@ int main(int argc, char **argv)
                 emulator.RunFrame(deltaSeconds);
             }
 
-            if (appMenu.IsVisible())
+            if (appMenu.NeedsDraw())
                 appMenu.RenderToBuffer(uiRenderer);
             const int anaglyph = g_eyeView == 0 ? AnaglyphOf(settings.screen3D) : 0;
             emulator.PrepareScreen(uiRenderer, chosen.format, settings.ScreenTint(), settings.ScreenPattern(),
@@ -893,7 +955,7 @@ int main(int argc, char **argv)
                 else
                     touch.Draw(uiRenderer);
             }
-            if (appMenu.IsVisible())
+            if (appMenu.NeedsDraw()) // (the menu, or a notice over the game)
                 for (int i = 0; i < paneCount; ++i)
                     appMenu.Draw(uiRenderer, panes[i].ox + menuX * panes[i].qx, panes[i].oy + menuY * panes[i].qy, panes[i].qx,
                                  panes[i].qy);

@@ -25,6 +25,7 @@ logo (`assets/logo/`) is Juan's own artwork.
 | [FreeType](https://freetype.org) | font rendering | FreeType License (`licenses/FTL-FreeType.txt`) |
 | [GLFW](https://www.glfw.org) (desktop only) | windows and input | zlib (`licenses/Zlib-GLFW.txt`) |
 | [stb_image, stb_image_write](https://github.com/nothings/stb) | PNG/JPEG reading and writing | public domain or MIT (in the headers, `third_party/`) |
+| [rcheevos](https://github.com/RetroAchievements/rcheevos) | RetroAchievements: the client, its rules and MD5 | MIT (`licenses/MIT-rcheevos.txt`) |
 | [miniaudio](https://miniaud.io) | audio output | public domain or MIT-0 (in the header, `third_party/`) |
 | OmniScale by Lior Halphon, from [SameBoy](https://github.com/LIJI32/SameBoy) | the screen's Smooth look (`shaders/screen_filter.frag`) | Expat/MIT (`licenses/Expat-SameBoy-OmniScale.txt`) |
 

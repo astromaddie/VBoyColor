@@ -102,6 +102,21 @@ public:
     // filled - reported once), -1 failed or none.
     virtual int PollDownload(std::vector<uint8_t> & /*bytes*/, int /*slot*/ = kDownloadBoxArt) { return -1; }
 
+    // ---- Web requests (RetroAchievements - see achievements/Achievements.h):
+    // any number at once, each in the background. ----
+    struct HttpRequest
+    {
+        std::string url;
+        std::string postData;    // sent as a POST when not empty (else a GET)
+        std::string contentType; // postData's
+        std::string userAgent;
+    };
+    // Starts one; returns its id (> 0), or 0 where this platform can't.
+    virtual int StartHttpRequest(const HttpRequest & /*request*/) { return 0; }
+    // 0 still running; 1 done - status is the HTTP status code (-1: no
+    // connection), body what came back (reported once); -1 unknown id.
+    virtual int PollHttpRequest(int /*id*/, int & /*status*/, std::vector<uint8_t> & /*body*/) { return -1; }
+
     // ---- Updates (core/io/Updater.h) ----
 
     // Which release download is this app's: "windows" (the .zip), "linux"

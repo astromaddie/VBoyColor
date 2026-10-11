@@ -446,7 +446,7 @@ namespace
 
 MenuList::MenuList(UiRenderer &ui, UiFontHandle font, float posX, float posY, float width, float height, float itemHeight,
                    const UiIconSet *icons)
-    : m_ui(&ui), m_font(font), m_boldFont(font), m_headerFont(font), m_icons(icons), m_posX(posX), m_posY(posY),
+    : m_ui(&ui), m_font(font), m_boldFont(font), m_headerFont(font), m_subtitleFont(font), m_icons(icons), m_posX(posX), m_posY(posY),
       m_width(width), m_height(height)
 {
     m_itemHeight = itemHeight;
@@ -460,6 +460,7 @@ void MenuList::SetFonts(UiFontHandle boldFont, UiFontHandle headerFont)
 {
     m_boldFont = boldFont;
     m_headerFont = headerFont;
+    m_subtitleFont = headerFont;
     m_ui->EnsureGlyphsForText(m_boldFont, "\xE2\x80\xB9\xE2\x80\xBA\xE2\x80\xA6\xC2\xB0\xC2\xB7");
     for (const auto &entry : m_entries)
     {
@@ -496,6 +497,13 @@ void MenuList::Entry::SetCaption(const std::string &newCaption)
         m_owner->m_ui->EnsureGlyphsForText(m_owner->m_font, newCaption);
         m_owner->m_ui->EnsureGlyphsForText(m_owner->m_boldFont, newCaption);
     }
+}
+
+void MenuList::Entry::SetSubtitle(const std::string &newSubtitle)
+{
+    subtitle = newSubtitle;
+    if (m_owner)
+        m_owner->m_ui->EnsureGlyphsForText(m_owner->m_subtitleFont, newSubtitle + "\xE2\x80\xA6");
 }
 
 void MenuList::Entry::SetSecondaryText(const std::string &newText)
@@ -612,10 +620,16 @@ void MenuList::Layout() const
             y += kGroupGap;
         gap = false;
         m_top[i] = y;
-        y += m_itemHeight;
+        y += RowHeight(static_cast<int>(i));
         any = true;
     }
     m_contentHeight = y;
+}
+
+float MenuList::RowHeight(int index) const
+{
+    const float h = m_entries[index]->rowHeight;
+    return h > 0.0f ? h : m_itemHeight;
 }
 
 float MenuList::ContentHeight() const
@@ -630,7 +644,7 @@ void MenuList::ScrollToSelection(bool instant)
         return;
     Layout();
     float top = m_top[m_selectedIndex];
-    const float bottom = top + m_itemHeight;
+    const float bottom = top + RowHeight(m_selectedIndex);
     // The first row of a group brings its header into view too.
     for (int j = m_selectedIndex - 1; j >= 0; --j)
     {
@@ -684,6 +698,26 @@ void MenuList::SelectIndex(int index)
         return;
     m_selectedIndex = index;
     ScrollToSelection(true);
+}
+
+void MenuList::SelectNear(int index)
+{
+    if (m_entries.empty())
+        return;
+    index = std::clamp(index, 0, static_cast<int>(m_entries.size()) - 1);
+    for (int d = 0; d < static_cast<int>(m_entries.size()); ++d)
+    {
+        if (index + d < static_cast<int>(m_entries.size()) && IsRow(index + d))
+        {
+            SelectIndex(index + d);
+            return;
+        }
+        if (index - d >= 0 && IsRow(index - d))
+        {
+            SelectIndex(index - d);
+            return;
+        }
+    }
 }
 
 int MenuList::PressedUp()
@@ -807,7 +841,7 @@ void MenuList::Draw(UiRenderer &ui, float offsetX, float offsetY, float alpha)
                 last = j;
         }
         const float cardTop = rowY(static_cast<int>(i));
-        const float cardBottom = rowY(static_cast<int>(last)) + m_itemHeight;
+        const float cardBottom = rowY(static_cast<int>(last)) + RowHeight(static_cast<int>(last));
         const bool action = m_entries[i]->centered && i == last;
         if (shown(cardTop, cardBottom - cardTop))
         {
@@ -837,16 +871,16 @@ void MenuList::Draw(UiRenderer &ui, float offsetX, float offsetY, float alpha)
                             1.0f, WithAlpha(kMenuDimTextColor, alpha));
             continue;
         }
-        if (!IsRow(i) || !shown(y, m_itemHeight))
+        if (!IsRow(i) || !shown(y, RowHeight(i)))
             continue;
 
-        const float h = m_itemHeight;
+        const float h = RowHeight(i);
         const bool sel = focused && i == m_selectedIndex;
         if (sel)
             DrawSelectionFrame(ui, x, y, w, h, 5.0f, alpha, kMenuCardColor);
 
         const UiFontHandle labelFont = sel ? m_boldFont : m_font;
-        const XrColor4f textColor = WithAlpha(sel ? SelectionColor : Color, alpha);
+        const XrColor4f textColor = WithAlpha(sel ? SelectionColor : entry.dim ? kMenuDimTextColor : Color, alpha);
         const XrColor4f dimColor = WithAlpha(sel ? XrColor4f{1.0f, 0.79f, 0.34f, 0.7f} : kMenuDimTextColor, alpha);
         const float centerY = y + h / 2.0f;
         const bool hasIcon = m_icons && entry.icon != UiIconId::None;
@@ -865,10 +899,81 @@ void MenuList::Draw(UiRenderer &ui, float offsetX, float offsetY, float alpha)
         }
 
         const float iconX = x + kRowPad;
-        if (hasIcon)
+        float labelX = iconX + (hasIconSpace ? kIconSize + kIconTextGap : 0.0f);
+        if (entry.leftDraw)
+        {
+            // A picture as tall as the row allows, the text beside it.
+            const float size = h - 6.0f;
+            entry.leftDraw(ui, iconX, y + 3.0f, size, alpha);
+            labelX = iconX + size + kIconTextGap + 1.0f;
+        }
+        else if (hasIcon)
             m_icons->Draw(ui, entry.icon, iconX, centerY - kIconSize / 2.0f, kIconSize, alpha, iconTint);
-        const float labelX = iconX + (hasIconSpace ? kIconSize + kIconTextGap : 0.0f);
-        ui.DrawText(labelFont, label, labelX, TextY(ui, labelFont, centerY), 1.0f, textColor);
+        if (entry.subtitle.empty())
+            ui.DrawText(labelFont, label, labelX, TextY(ui, labelFont, centerY), 1.0f, textColor);
+        else
+        {
+            // The label on top, the subtitle under it - word-wrapped, two
+            // lines at most - all left of the value.
+            const float valueW = entry.value.empty() ? 0.0f : ui.GetTextWidth(m_font, entry.value) + 6.0f;
+            const float textW = std::max(20.0f, x + w - kRowPad - valueW - labelX);
+            auto fit = [&](UiFontHandle font, const std::string &text)
+            {
+                if (ui.GetTextWidth(font, text) <= textW)
+                    return text;
+                std::string cut = text;
+                while (!cut.empty() && ui.GetTextWidth(font, cut + "\xE2\x80\xA6") > textW)
+                    cut.pop_back();
+                while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80)
+                    cut.pop_back(); // (not in the middle of a character)
+                if (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0x80))
+                    cut.pop_back();
+                return cut + "\xE2\x80\xA6";
+            };
+            std::vector<std::string> lines;
+            {
+                std::string line, word;
+                const std::string &sub = entry.subtitle;
+                for (size_t c = 0; c <= sub.size(); ++c)
+                {
+                    if (c < sub.size() && sub[c] != ' ')
+                    {
+                        word += sub[c];
+                        continue;
+                    }
+                    const std::string next = line.empty() ? word : line + " " + word;
+                    if (!line.empty() && ui.GetTextWidth(m_subtitleFont, next) > textW)
+                    {
+                        lines.push_back(line);
+                        line = word;
+                    }
+                    else
+                        line = next;
+                    word.clear();
+                }
+                if (!line.empty())
+                    lines.push_back(line);
+            }
+            if (lines.size() > 2)
+            {
+                std::string rest = lines[1];
+                for (size_t k = 2; k < lines.size(); ++k)
+                    rest += " " + lines[k];
+                lines.resize(2);
+                lines[1] = rest;
+            }
+            constexpr float kLine = 7.5f;
+            const float block = 10.0f + kLine * static_cast<float>(lines.size());
+            float lineY = centerY - block / 2.0f;
+            ui.DrawText(labelFont, fit(labelFont, label), labelX, TextY(ui, labelFont, lineY + 4.5f), 1.0f, textColor);
+            lineY += 10.0f;
+            for (const std::string &line : lines)
+            {
+                ui.DrawText(m_subtitleFont, fit(m_subtitleFont, line), labelX, TextY(ui, m_subtitleFont, lineY + kLine / 2.0f), 1.0f,
+                            dimColor);
+                lineY += kLine;
+            }
+        }
 
         const float right = x + w - kRowPad;
         if (entry.twoColumn)
@@ -964,7 +1069,7 @@ bool MenuList::HandlePointer(const MenuPointer &pointer)
     for (int i = 0; i < (int)m_entries.size(); ++i)
     {
         const float y = m_posY - m_scroll + m_top[i];
-        if (IsRow(i) && pointer.y >= y && pointer.y < y + m_itemHeight)
+        if (IsRow(i) && pointer.y >= y && pointer.y < y + RowHeight(i))
             hit = i;
     }
     if (hit < 0 || (!pointer.moved && !pointer.clicked))

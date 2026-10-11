@@ -233,6 +233,8 @@ void Emulator::Initialize(UiRenderer &ui, Platform &platform)
     m_displayRgba.resize(m_frameBufferRgba.size());
     m_records.resize(VBGO_TT_EYE_PIXELS);
 
+    m_achievements.Initialize(platform, ui);
+
     m_stopWorker = false;
     m_worker = std::thread(&Emulator::WorkerLoop, this);
 }
@@ -344,6 +346,8 @@ bool Emulator::LoadRom(const std::string &romPath, const std::string &displayNam
         LogLine("[Emulator] %s (CRC %08X, %u bytes): %s", m_romBaseName.c_str(), m_romCrc, m_romSize,
                 ReloadColorPack().c_str());
     }
+    // RetroAchievements: this game's (none for a movie's run, nor without a game).
+    m_achievements.GameLoaded(m_romLoaded ? m_romBytes : std::vector<uint8_t>(), m_movieSession);
 
     return m_romLoaded;
 }
@@ -361,6 +365,7 @@ bool Emulator::ResetGame()
     m_frameAccumulator = 0.0f;
     g_frameReady = false;
     retro_reset();
+    m_achievements.GameReset();
     return true;
 }
 
@@ -444,6 +449,9 @@ void Emulator::RunCoreFrames(int runs)
         }
         const auto runStart = std::chrono::steady_clock::now();
         retro_run();
+        // RetroAchievements: this frame's memory against the achievements (a
+        // movie's run plays without them - see Achievements::GameLoaded).
+        m_achievements.DoFrame();
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - runStart).count();
         m_emulationMs += ms;
         m_emulationMaxMs = std::max(m_emulationMaxMs, ms);
@@ -1373,6 +1381,14 @@ bool Emulator::SaveState(int uiSlot)
     if (!m_platform->WriteRomsFile(StateFileName(uiSlot, "state"), true, data.data(), data.size()))
         return false;
     m_platform->WriteRomsFile(StateFileName(uiSlot, "stateimg"), true, preview.data(), preview.size());
+    // The achievements' progress at this moment, beside it (".stateach" - always
+    // written, so an older one never comes back with a newer state).
+    {
+        std::vector<uint8_t> progress = m_achievements.SaveProgress();
+        if (progress.empty())
+            progress = {'n', 'o', 'n', 'e'};
+        m_platform->WriteRomsFile(StateFileName(uiSlot, "stateach"), true, progress.data(), progress.size());
+    }
 
     // And the left eye as the screen showed it (colors and all), for the
     // menu's preview - .stateimg stays the plain luminance FrontendGo wrote.
@@ -1419,6 +1435,11 @@ bool Emulator::LoadState(int uiSlot)
         return false;
     vbgo_tiletrack_reset(); // (the frame buffers now hold what the state saved - nothing tracked drew it)
     StopMovie(); // (the run's next frame no longer follows)
+    // The achievements' progress saved with it (none: they start over).
+    std::vector<uint8_t> progress = m_platform->ReadRomsFile(StateFileName(uiSlot, "stateach"), true);
+    if (progress.size() == 4 && std::memcmp(progress.data(), "none", 4) == 0)
+        progress.clear();
+    m_achievements.LoadProgress(progress);
     return true;
 }
 

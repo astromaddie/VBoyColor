@@ -13,6 +13,9 @@
 #include "menu/pages/MoveScreenPage.h"
 #include "menu/pages/FolderPage.h"
 #include "menu/pages/AboutPage.h"
+#include "menu/pages/AchievementsPage.h"
+#include "menu/pages/TextInputPage.h"
+#include "achievements/Achievements.h"
 #include "gfx/UiRenderer.h"
 
 #include <cstdint>
@@ -50,6 +53,7 @@ public:
         SidebarResume,
         SidebarLibrary,
         SidebarSaveStates,
+        SidebarAchievements,
         SidebarSettings,
         SidebarAbout,
         SidebarCount
@@ -152,6 +156,20 @@ public:
 
     ThumbnailLibrary &Thumbnails() { return m_thumbnails; }
 
+    // Anything to draw this frame: the menu, or a notice over the game
+    // (an achievement unlocked - see Achievements::TakeNotice). Platforms call
+    // RenderToBuffer and Draw while this is true (not only while visible).
+    bool NeedsDraw() const { return IsVisible() || NoticeShowing(); }
+    bool NoticeShowing() const { return m_notice.active && !IsVisible(); }
+
+    // Typing on a real keyboard (the window app): while a text field is open
+    // (WantsText), its characters (UTF-8), Backspace and Enter go to it - and
+    // the keys the menu otherwise uses (S, A, W, D, Backspace) don't.
+    bool WantsText() const;
+    void TypeText(const std::string &utf8);
+    void TypeBackspace();
+    void TypeEnter();
+
 private:
     class Sidebar;
     struct Logo
@@ -187,6 +205,10 @@ private:
     void DrawHints(UiRenderer &ui);
     void LoadLogo(UiRenderer &ui);
     void RebuildLogo(UiRenderer &ui);
+    // Notices over the game (see NoticeShowing).
+    void UpdateNotice(float deltaSeconds);
+    void RenderNotice(UiRenderer &ui);
+    void DrawNotice(UiRenderer &ui, float x, float y, float squeezeX, float squeezeY);
     int m_logoTries = 0;
 
     LibraryPage m_libraryPage;
@@ -197,6 +219,8 @@ private:
     FolderPage m_folderPage;
     GameControlsPage m_gameControlsPage;
     AboutPage m_aboutPage;
+    AchievementsPage m_achievementsPage;
+    TextInputPage m_textInputPage;
     GameControls m_gameControls;
 
     ThumbnailLibrary m_thumbnails;
@@ -247,6 +271,15 @@ private:
     UiIconSet m_icons;
     UiMenuResources m_resources; // fonts/&m_icons - see UiMenuResources.h
     UiImageHandle m_offscreenTexture;
+    // The notice showing (an achievement unlocked...), rendered into its own
+    // texture and drawn at the top of where the menu would be.
+    struct ShownNotice
+    {
+        bool active = false;
+        Achievements::Notice notice;
+        float age = 0; // seconds shown
+    } m_notice;
+    UiImageHandle m_noticeTexture;
     float m_menuScale = kMenuScale; // see SetMenuScale
     std::string m_versionLine1, m_versionLine2;
 
