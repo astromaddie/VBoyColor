@@ -108,7 +108,7 @@ void AboutPage::Init(UiRenderer &ui, const UiMenuResources &resources)
         {"Thanks", bold, kMenuSelectionColor},
         {"VirtualBoyGo by CidVonHighwind - where the inspiration started", body, kMenuTextColor},
         {"Red Viper - whose colors inspired our gradients", body, kMenuTextColor},
-        {"Button icons: Input Prompts by Kenney (kenney.nl), CC0", body, kMenuTextColor},
+        {"Icons: Input Prompts by Kenney (kenney.nl), CC0", body, kMenuTextColor},
     };
     for (const auto &line : cards->lines)
         ui.EnsureGlyphsForText(line.font, line.text);

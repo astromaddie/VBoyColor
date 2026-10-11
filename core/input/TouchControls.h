@@ -95,8 +95,14 @@ private:
     // not on it.
     uint32_t DpadBits(const Circle &pad, float x, float y, uint32_t up, uint32_t down, uint32_t left, uint32_t right) const;
     void DrawDpad(UiRenderer &ui, const Circle &pad, uint32_t up, uint32_t down, uint32_t left, uint32_t right) const;
-    void DrawButton(UiRenderer &ui, const Circle &c, const char *label, bool pressed, UiFontHandle font) const;
+    // (the bar's and "Back to game"'s buttons - the controls are icons, DrawIcon)
     void DrawPill(UiRenderer &ui, const Rect &r, const char *label, bool pressed, UiFontHandle font) const;
+    // One of the controls' icons (TouchIcon in the .cpp - Kenney's Input
+    // Prompts), size pixels square around (cx, cy); pressed: red.
+    void DrawIcon(UiRenderer &ui, int icon, float cx, float cy, float size, bool pressed) const;
+    // The icon atlas with cells big enough for the controls as laid out
+    // (64, 128 or 256 pixels - loaded when first needed).
+    void ChooseAtlas();
 
     // The controls the player can move (Adjust: how they moved them).
     enum Element
@@ -127,6 +133,9 @@ private:
     Adjust &AdjustOf(int element) { return m_adjust[m_h > m_w ? 1 : 0][element]; }
 
     UiRenderer *m_ui = nullptr;
+    Platform *m_platform = nullptr;
+    UiImageHandle m_atlases[3];
+    int m_atlas = -1; // which m_atlases draws
     std::vector<uint8_t> m_fontBytes;
     float m_fontDp = 0.0f; // the density the fonts are baked for
     UiFontHandle m_font, m_smallFont;

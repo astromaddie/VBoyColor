@@ -6,6 +6,30 @@
 #include <cstdio>
 #include <unistd.h>
 
+namespace
+{
+    // Detaches a thread Env() attached, when the thread ends.
+    struct ThreadAttachment
+    {
+        JavaVM *vm = nullptr;
+        ~ThreadAttachment()
+        {
+            if (vm)
+                vm->DetachCurrentThread();
+        }
+    };
+    thread_local ThreadAttachment t_attachment;
+} // namespace
+
+JNIEnv *AndroidPlatform::Env() const
+{
+    JNIEnv *env = nullptr;
+    if (m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) == JNI_EDETACHED &&
+        m_vm->AttachCurrentThread(&env, nullptr) == JNI_OK)
+        t_attachment.vm = m_vm;
+    return env;
+}
+
 AndroidPlatform::AndroidPlatform(JavaVM *vm, jobject activityClazz, AAssetManager *assetManager)
     : m_vm(vm), m_assetManager(assetManager)
 {
@@ -16,8 +40,7 @@ AndroidPlatform::AndroidPlatform(JavaVM *vm, jobject activityClazz, AAssetManage
 
 bool AndroidPlatform::HasRomsFolder() const
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID getUri = env->GetMethodID(activityClass, "getRomsTreeUriString", "()Ljava/lang/String;");
@@ -31,8 +54,7 @@ bool AndroidPlatform::HasRomsFolder() const
 
 void AndroidPlatform::RequestChangeRomsFolder()
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID request = env->GetMethodID(activityClass, "requestChangeRomsFolder", "()V");
@@ -43,8 +65,7 @@ void AndroidPlatform::RequestChangeRomsFolder()
 std::vector<RomEntry> AndroidPlatform::ScanRoms()
 {
     std::vector<RomEntry> result;
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID listMethod = env->GetMethodID(activityClass, "listRomFiles", "()[Ljava/lang/String;");
@@ -105,8 +126,7 @@ std::vector<uint8_t> AndroidPlatform::ReadAllFromFd(int fd)
 
 std::vector<uint8_t> AndroidPlatform::ReadRomFile(const std::string &path)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID openMethod = env->GetMethodID(activityClass, "openRomFileDescriptor", "(Ljava/lang/String;)I");
@@ -120,8 +140,7 @@ std::vector<uint8_t> AndroidPlatform::ReadRomFile(const std::string &path)
 
 bool AndroidPlatform::WriteRomsFile(const std::string &fileName, bool inStatesDir, const void *data, size_t size)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID openMethod = env->GetMethodID(activityClass, "openDataFileForWrite", "(ILjava/lang/String;)I");
@@ -146,8 +165,7 @@ bool AndroidPlatform::WriteRomsFile(const std::string &fileName, bool inStatesDi
 
 std::vector<uint8_t> AndroidPlatform::ReadRomsFile(const std::string &fileName, bool inStatesDir)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID openMethod = env->GetMethodID(activityClass, "openDataFileForRead", "(ILjava/lang/String;)I");
@@ -161,8 +179,7 @@ std::vector<uint8_t> AndroidPlatform::ReadRomsFile(const std::string &fileName, 
 
 bool AndroidPlatform::RomsFileExists(const std::string &fileName, bool inStatesDir) const
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID existsMethod = env->GetMethodID(activityClass, "dataFileExists", "(ILjava/lang/String;)Z");
@@ -175,8 +192,7 @@ bool AndroidPlatform::RomsFileExists(const std::string &fileName, bool inStatesD
 
 std::string AndroidPlatform::CallKindString(const char *method, DataKind kind) const
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID id = env->GetMethodID(activityClass, method, "(I)Ljava/lang/String;");
     env->DeleteLocalRef(activityClass);
@@ -210,8 +226,7 @@ std::string AndroidPlatform::PickDataFolder(DataKind kind)
 
 std::string AndroidPlatform::TakeDataFolderStatus()
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID id = env->GetMethodID(activityClass, "takeFolderStatus", "()Ljava/lang/String;");
     env->DeleteLocalRef(activityClass);
@@ -229,8 +244,7 @@ std::string AndroidPlatform::TakeDataFolderStatus()
 
 int AndroidPlatform::GetBatteryPercent() const
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID getBatteryLevel = env->GetMethodID(activityClass, "getBatteryLevel", "()I");
@@ -241,8 +255,7 @@ int AndroidPlatform::GetBatteryPercent() const
 
 bool AndroidPlatform::StartDownload(const std::string &url, int slot)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID start = env->GetMethodID(activityClass, "startDownload", "(Ljava/lang/String;I)Z");
@@ -255,8 +268,7 @@ bool AndroidPlatform::StartDownload(const std::string &url, int slot)
 
 int AndroidPlatform::PollDownload(std::vector<uint8_t> &bytes, int slot)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID poll = env->GetMethodID(activityClass, "pollDownload", "(I)I");
@@ -285,8 +297,7 @@ std::string AndroidPlatform::InstallUpdate(const std::vector<uint8_t> &package, 
     // (an APK is a zip - the cheapest sanity check)
     if (package.size() < 4 || package[0] != 'P' || package[1] != 'K')
         return "The download isn't an APK - nothing changed";
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID install = env->GetMethodID(activityClass, "installUpdate", "([B)Ljava/lang/String;");
     env->DeleteLocalRef(activityClass);
@@ -308,8 +319,7 @@ std::string AndroidPlatform::InstallUpdate(const std::vector<uint8_t> &package, 
 
 std::string AndroidPlatform::TakeUpdateStatus()
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID take = env->GetMethodID(activityClass, "takeInstallStatus", "()Ljava/lang/String;");
     env->DeleteLocalRef(activityClass);
@@ -327,8 +337,7 @@ std::string AndroidPlatform::TakeUpdateStatus()
 
 void AndroidPlatform::OpenUrl(const std::string &url)
 {
-    JNIEnv *env = nullptr;
-    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    JNIEnv *env = Env();
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID open = env->GetMethodID(activityClass, "openUrl", "(Ljava/lang/String;)V");
     env->DeleteLocalRef(activityClass);

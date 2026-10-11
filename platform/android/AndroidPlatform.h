@@ -52,6 +52,10 @@ public:
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 
 private:
+    // This thread's JNI environment - attached to the VM first if it isn't
+    // yet (the library checks its games on threads of their own; they're
+    // detached again when they end).
+    JNIEnv *Env() const;
     // Calls a MainActivity method taking (int kind) and returning a String.
     std::string CallKindString(const char *method, DataKind kind) const;
     // Shared by ReadRomFile/ReadRomsFile - fd < 0 returns empty.

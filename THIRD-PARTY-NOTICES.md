@@ -41,7 +41,7 @@ Portions of this software are copyright © 2023 The FreeType Project
 
 | Icons | License |
 |---|---|
-| The menu's A / B / X / Y button icons - [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney (kenney.nl) | CC0 1.0 (public domain) - credit given gladly |
+| The menu's A / B / X / Y button icons and the phone's touch controls (D-pad, A, B, L, R, - / +, home) - [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney (kenney.nl), Nintendo Switch set | CC0 1.0 (public domain) - credit given gladly |
 
 ## Build tools (not shipped)
 

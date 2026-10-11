@@ -283,15 +283,23 @@ void ThumbnailLibrary::CheckPackNext()
         Game *game = Find(name);
         if (!game || game->packChecked)
             continue;
-        const std::vector<uint8_t> rom = m_platform->ReadRomFile(game->rom.fullPath);
-        if (rom.empty())
-        {
-            game->packChecked = true; // (as last known)
-            return;
-        }
-        const uint32_t crc = TileColorPack::Crc32(rom.data(), rom.size());
-        SetHasPack(*game, !Emulator::FindPackBytes(*m_platform, name, crc, static_cast<uint32_t>(rom.size())).empty());
-        return; // (one a frame)
+        m_checkIsPack = true;
+        m_check = std::async(std::launch::async,
+                             [platform = m_platform, name, path = game->rom.fullPath]()
+                             {
+                                 Checked checked;
+                                 checked.name = name;
+                                 checked.packOnly = true;
+                                 const std::vector<uint8_t> rom = platform->ReadRomFile(path);
+                                 if (rom.empty())
+                                     return checked;
+                                 checked.read = true;
+                                 const uint32_t crc = TileColorPack::Crc32(rom.data(), rom.size());
+                                 checked.hasPack =
+                                     !Emulator::FindPackBytes(*platform, name, crc, static_cast<uint32_t>(rom.size())).empty();
+                                 return checked;
+                             });
+        return; // (one at a time)
     }
 }
 
@@ -445,7 +453,7 @@ bool ThumbnailLibrary::BoxArtToCome() const
 
 int ThumbnailLibrary::Remaining() const
 {
-    int remaining = m_making.empty() ? 0 : 1;
+    int remaining = (m_making.empty() ? 0 : 1) + (m_toMake ? 1 : 0) + (m_check.valid() && !m_checkIsPack ? 1 : 0);
     for (const std::string &name : m_checkQueue)
         if (!WaitingForBoxArt(name))
             ++remaining;
@@ -620,10 +628,28 @@ void ThumbnailLibrary::Update(bool allowed)
     else if (m_boxArt && !m_downloadsUnavailable)
         DownloadNext();
 
-    if (allowed && m_making.empty() && !m_checkQueue.empty() && m_emulator->WantsThumbnailInput())
-        CheckNext();
-    if (allowed)
-        CheckPackNext();
+    // Checks (on a thread of their own): one finished, the next started - and
+    // a title screen to make, given to the worker once it's free.
+    if (m_check.valid() && m_check.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        FinishCheck(m_check.get());
+    if (m_toMake && allowed && m_making.empty() && m_emulator->WantsThumbnailInput())
+    {
+        if (Find(m_toMake->name))
+        {
+            m_making = m_toMake->name;
+            m_makingKey = m_toMake->key;
+            m_makingHasPack = m_toMake->hasPack;
+            m_emulator->GiveThumbnailInput(std::move(m_toMake->input));
+        }
+        m_toMake.reset();
+    }
+    if (allowed && !m_check.valid() && !m_toMake)
+    {
+        if (m_making.empty() && !m_checkQueue.empty())
+            CheckNext();
+        if (!m_check.valid())
+            CheckPackNext();
+    }
     if (m_resort) // (a game's pack turned up or went: the shown games changed)
         Sort();
 
@@ -648,46 +674,66 @@ void ThumbnailLibrary::CheckNext()
     if (!game)
         return;
 
-    Emulator::ThumbnailInput input;
-    input.name = name;
-    input.rom = m_platform->ReadRomFile(game->rom.fullPath);
-    if (input.rom.empty())
+    // (the settings as they are now: the thread doesn't touch the live ones)
+    m_checkIsPack = false;
+    m_check = std::async(
+        std::launch::async,
+        [platform = m_platform, name, path = game->rom.fullPath, colors = *m_settings]() mutable
+        {
+            Checked checked;
+            checked.name = name;
+            Emulator::ThumbnailInput &input = checked.input;
+            input.name = name;
+            input.rom = platform->ReadRomFile(path);
+            if (input.rom.empty())
+                return checked;
+            checked.read = true;
+            const uint32_t crc = TileColorPack::Crc32(input.rom.data(), input.rom.size());
+            const uint32_t size = static_cast<uint32_t>(input.rom.size());
+            const ThumbnailRecipe &recipe = ThumbnailRecipeFor(crc);
+            input.pack = Emulator::FindPackBytes(*platform, name, crc, size);
+            checked.hasPack = !input.pack.empty();
+
+            // The colors it starts with: its own (saved for it in Settings), its
+            // suggestion, or Auto - what LibraryPage applies when it loads.
+            colors.ApplyGameColors(*platform, name, crc);
+            input.shadePalette = colors.EffectiveShadePalette();
+            input.pattern = colors.ScreenPattern();
+            const XrColor4f tint = colors.ScreenTint();
+            input.tint[0] = tint.r;
+            input.tint[1] = tint.g;
+            input.tint[2] = tint.b;
+
+            char key[160];
+            std::snprintf(key, sizeof(key), "f%d r%08x %u %u c%d %d %.3f %.3f %.3f p%zu %08x", kThumbnailFormat, crc,
+                          recipe.lastPress, recipe.frame, input.shadePalette, input.pattern, input.tint[0],
+                          input.tint[1], input.tint[2], input.pack.size(),
+                          input.pack.empty() ? 0u : TileColorPack::Crc32(input.pack.data(), input.pack.size()));
+            checked.key = key;
+            return checked;
+        });
+}
+
+void ThumbnailLibrary::FinishCheck(Checked checked)
+{
+    Game *game = Find(checked.name);
+    if (!game) // (gone from the folder meanwhile)
+        return;
+    if (!checked.read)
     {
-        game->failed = !game->ready;
+        if (checked.packOnly)
+            game->packChecked = true; // (as last known)
+        else
+            game->failed = !game->ready;
         return;
     }
-    const uint32_t crc = TileColorPack::Crc32(input.rom.data(), input.rom.size());
-    const uint32_t size = static_cast<uint32_t>(input.rom.size());
-    const ThumbnailRecipe &recipe = ThumbnailRecipeFor(crc);
-    input.pack = Emulator::FindPackBytes(*m_platform, name, crc, size);
-    SetHasPack(*game, !input.pack.empty());
-    if (WantsBoxArt(name)) // (and it has it): no title screen needed
+    SetHasPack(*game, checked.hasPack);
+    if (checked.packOnly || WantsBoxArt(checked.name)) // (and it has it): no title screen needed
         return;
-
-    // The colors it starts with: its own (saved for it in Settings), its
-    // suggestion, or Auto - what LibraryPage applies when it loads.
-    AppSettings colors = *m_settings;
-    colors.ApplyGameColors(*m_platform, name, crc);
-    input.shadePalette = colors.EffectiveShadePalette();
-    input.pattern = colors.ScreenPattern();
-    const XrColor4f tint = colors.ScreenTint();
-    input.tint[0] = tint.r;
-    input.tint[1] = tint.g;
-    input.tint[2] = tint.b;
-
-    char key[160];
-    std::snprintf(key, sizeof(key), "f%d r%08x %u %u c%d %d %.3f %.3f %.3f p%zu %08x", kThumbnailFormat, crc,
-                  recipe.lastPress, recipe.frame, input.shadePalette, input.pattern, input.tint[0], input.tint[1],
-                  input.tint[2], input.pack.size(),
-                  input.pack.empty() ? 0u : TileColorPack::Crc32(input.pack.data(), input.pack.size()));
-
-    const auto saved = m_saved.find(name);
-    if (saved != m_saved.end() && saved->second.key == key)
+    const auto saved = m_saved.find(checked.name);
+    if (saved != m_saved.end() && saved->second.key == checked.key)
         return; // up to date
-    m_making = name;
-    m_makingKey = key;
-    m_makingHasPack = !input.pack.empty();
-    m_emulator->GiveThumbnailInput(std::move(input));
+    m_toMake = std::move(checked);
 }
 
 void ThumbnailLibrary::Upload(Game &game, const std::vector<uint8_t> &rgb, bool box)
@@ -739,6 +785,12 @@ void ThumbnailLibrary::LoadArchive()
 
 void ThumbnailLibrary::SaveArchive()
 {
+    if (m_saving.valid())
+    {
+        if (m_saving.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            return; // (still writing the last one - next time)
+        m_saving.get();
+    }
     std::vector<uint8_t> bytes(kArchiveMagic, kArchiveMagic + 8);
     AppendLe(bytes, static_cast<uint32_t>(m_saved.size()), 4);
     for (const auto &[name, saved] : m_saved)
@@ -749,7 +801,10 @@ void ThumbnailLibrary::SaveArchive()
         AppendLe(bytes, static_cast<uint32_t>(saved.png.size()), 4);
         bytes.insert(bytes.end(), saved.png.begin(), saved.png.end());
     }
-    m_platform->WriteRomsFile(kArchiveName, true, bytes.data(), bytes.size());
+    // (written on a thread of its own: a few MB through the system's folder
+    // access would hold the menu up)
+    m_saving = std::async(std::launch::async, [platform = m_platform, bytes = std::move(bytes)]()
+                          { platform->WriteRomsFile(kArchiveName, true, bytes.data(), bytes.size()); });
     m_archiveDirty = false;
     m_framesSinceSave = 0;
 }

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <sstream>
+#include <tuple>
 
 namespace
 {
@@ -15,8 +16,31 @@ namespace
     constexpr uint32_t Bit(uint32_t vbBit) { return 1u << vbBit; }
 
     const XrColor4f kFill{1.0f, 1.0f, 1.0f, 0.13f};
-    const XrColor4f kFillDark{0.0f, 0.0f, 0.0f, 0.22f};
     const XrColor4f kPressed{0.97f, 0.77f, 0.27f, 0.60f};
+
+    // The controls' icons: Kenney's Input Prompts (Nintendo Switch, CC0),
+    // packed by tools/pack_touch_atlas.py in this order, 4 to a row - white,
+    // the letters see-through; the arms are masks of the D-pad's arms.
+    enum TouchIcon
+    {
+        kIconDpad,
+        kIconArmUp,
+        kIconArmDown,
+        kIconArmLeft,
+        kIconArmRight,
+        kIconA,
+        kIconB,
+        kIconL,
+        kIconR,
+        kIconMinus,
+        kIconPlus,
+        kIconHome,
+        kIconCount
+    };
+    constexpr int kAtlasColumns = 4, kAtlasRows = (kIconCount + kAtlasColumns - 1) / kAtlasColumns;
+    constexpr int kAtlasCells[3] = {64, 128, 256};
+    constexpr float kIconAlpha = 0.5f, kIconPressedAlpha = 0.9f;
+    const XrColor4f kIconPressedTint{0.91f, 0.20f, 0.27f, 1.0f}; // (the red of Kenney's pressed D-pad)
     const XrColor4f kLabel{1.0f, 1.0f, 1.0f, 0.78f};
     const XrColor4f kEditBox{0.97f, 0.77f, 0.27f, 0.22f};
     const XrColor4f kEditBar{0.08f, 0.09f, 0.12f, 0.88f};
@@ -36,6 +60,7 @@ namespace
 void TouchControls::Initialize(UiRenderer &ui, Platform &platform)
 {
     m_ui = &ui;
+    m_platform = &platform;
     m_fontBytes = platform.LoadAssetBytes("fonts/Roboto-Bold.ttf");
     if (m_fontBytes.empty())
         return;
@@ -148,6 +173,26 @@ void TouchControls::Layout(float w, float h, float dp, bool rightDpad)
     ApplyAdjust();
 }
 
+void TouchControls::ChooseAtlas()
+{
+    // The biggest control, drawn from a cell at most about 1.6 times smaller
+    // (bigger is sharp; a bit smaller still smooth).
+    float biggest = 0.0f;
+    for (const Circle *c : {&m_leftPad, &m_rightPad, &m_a, &m_b, &m_menu})
+        biggest = std::max(biggest, 2.0f * c->r);
+    int atlas = 0;
+    while (atlas < 2 && kAtlasCells[atlas] * 1.6f < biggest)
+        ++atlas;
+    m_atlas = atlas;
+    if (!m_atlases[atlas].IsValid() && m_ui && m_platform)
+    {
+        const std::vector<uint8_t> bytes = m_platform->LoadAssetBytes("icons/touch_atlas_" + std::to_string(kAtlasCells[atlas]) + ".png");
+        uint32_t w = 0, h = 0;
+        if (!bytes.empty())
+            m_atlases[atlas] = m_ui->LoadImage(bytes, w, h);
+    }
+}
+
 void TouchControls::ApplyAdjust()
 {
     const bool portrait = m_h > m_w;
@@ -190,6 +235,7 @@ void TouchControls::ApplyAdjust()
     m_editBigger = {bx + (bw + gap), gap, bw, bh};
     m_editReset = {bx + 2.0f * (bw + gap), gap, bw, bh};
     m_editDone = {bx + 3.0f * (bw + gap), gap, bw, bh};
+    ChooseAtlas();
 }
 
 void TouchControls::ElementBox(int element, float &x, float &y, float &w, float &h) const
@@ -471,31 +517,29 @@ uint32_t TouchControls::Update(const std::vector<Touch> &touches, bool &menuPres
     return m_pressed;
 }
 
+void TouchControls::DrawIcon(UiRenderer &ui, int icon, float cx, float cy, float size, bool pressed) const
+{
+    const UiImageHandle atlas = m_atlas >= 0 ? m_atlases[m_atlas] : UiImageHandle{};
+    if (!atlas.IsValid())
+        return;
+    const float u0 = static_cast<float>(icon % kAtlasColumns) / kAtlasColumns;
+    const float v0 = static_cast<float>(icon / kAtlasColumns) / kAtlasRows;
+    ui.DrawImageRegion(atlas, cx - size / 2.0f, cy - size / 2.0f, size, size, u0, v0, u0 + 1.0f / kAtlasColumns,
+                       v0 + 1.0f / kAtlasRows, pressed ? kIconPressedAlpha : kIconAlpha,
+                       pressed ? kIconPressedTint : XrColor4f{1.0f, 1.0f, 1.0f, 1.0f});
+}
+
 void TouchControls::DrawDpad(UiRenderer &ui, const Circle &pad, uint32_t up, uint32_t down, uint32_t left,
                              uint32_t right) const
 {
-    const float r = pad.r, arm = r * 0.72f, round = arm * 0.22f;
-    // A cross: the arms, and the middle once (not twice - it's see-through).
-    ui.DrawQuadRounded(pad.x - r, pad.y - arm / 2.0f, r - arm / 2.0f, arm, kFill, round);
-    ui.DrawQuadRounded(pad.x + arm / 2.0f, pad.y - arm / 2.0f, r - arm / 2.0f, arm, kFill, round);
-    ui.DrawQuadRounded(pad.x - arm / 2.0f, pad.y - r, arm, 2.0f * r, kFill, round);
-    ui.DrawQuadRounded(pad.x - arm * 0.22f, pad.y - arm * 0.22f, arm * 0.44f, arm * 0.44f, kFillDark, arm * 0.22f);
-    const float inset = arm * 0.12f, len = r - arm / 2.0f - inset;
-    if (m_pressed & up)
-        ui.DrawQuadRounded(pad.x - arm / 2.0f + inset, pad.y - r + inset, arm - 2 * inset, len, kPressed, round);
-    if (m_pressed & down)
-        ui.DrawQuadRounded(pad.x - arm / 2.0f + inset, pad.y + arm / 2.0f, arm - 2 * inset, len, kPressed, round);
-    if (m_pressed & left)
-        ui.DrawQuadRounded(pad.x - r + inset, pad.y - arm / 2.0f + inset, len, arm - 2 * inset, kPressed, round);
-    if (m_pressed & right)
-        ui.DrawQuadRounded(pad.x + arm / 2.0f, pad.y - arm / 2.0f + inset, len, arm - 2 * inset, kPressed, round);
-}
-
-void TouchControls::DrawButton(UiRenderer &ui, const Circle &c, const char *label, bool pressed, UiFontHandle font) const
-{
-    ui.DrawQuadRounded(c.x - c.r, c.y - c.r, 2.0f * c.r, 2.0f * c.r, pressed ? kPressed : kFill, c.r);
-    if (font.IsValid())
-        ui.DrawText(font, label, c.x - ui.GetTextWidth(font, label) / 2.0f, TextY(ui, font, c.y), 1.0f, kLabel);
+    // The cross fills its cell (pack_touch_atlas.py): as wide as the pad.
+    const float size = 2.0f * pad.r * (16.0f / 14.0f);
+    DrawIcon(ui, kIconDpad, pad.x, pad.y, size, false);
+    const int arms[4] = {kIconArmUp, kIconArmDown, kIconArmLeft, kIconArmRight};
+    const uint32_t bits[4] = {up, down, left, right};
+    for (int i = 0; i < 4; ++i)
+        if (m_pressed & bits[i])
+            DrawIcon(ui, arms[i], pad.x, pad.y, size, true);
 }
 
 void TouchControls::DrawPill(UiRenderer &ui, const Rect &r, const char *label, bool pressed, UiFontHandle font) const
@@ -511,19 +555,31 @@ void TouchControls::Draw(UiRenderer &ui) const
     if (!m_visible)
         return;
     using namespace VBButtonBit;
+    // (a cell's shape spans 14/16 of it - pack_touch_atlas.py's padding)
+    constexpr float kCell = 16.0f / 14.0f;
     DrawDpad(ui, m_leftPad, Bit(LeftUp), Bit(LeftDown), Bit(LeftLeft), Bit(LeftRight));
     if (m_rightDpad)
         DrawDpad(ui, m_rightPad, Bit(RightUp), Bit(RightDown), Bit(RightLeft), Bit(RightRight));
-    DrawButton(ui, m_a, "A", m_pressed & Bit(A), m_font);
-    DrawButton(ui, m_b, "B", m_pressed & Bit(B), m_font);
-    DrawPill(ui, m_l, "L", m_pressed & Bit(L), m_font);
-    DrawPill(ui, m_r, "R", m_pressed & Bit(R), m_font);
-    DrawPill(ui, m_select, "SELECT", m_pressed & Bit(Select), m_smallFont);
-    DrawPill(ui, m_start, "START", m_pressed & Bit(Start), m_smallFont);
-    // The menu button: three bars.
-    ui.DrawQuadRounded(m_menu.x - m_menu.r, m_menu.y - m_menu.r, 2 * m_menu.r, 2 * m_menu.r, m_menuDown ? kPressed : kFill,
-                       m_menu.r);
-    const float bw = m_menu.r * 0.9f, bh = std::max(2.0f, m_menu.r * 0.14f);
-    for (int i = -1; i <= 1; ++i)
-        ui.DrawQuadRounded(m_menu.x - bw / 2.0f, m_menu.y + i * m_menu.r * 0.34f - bh / 2.0f, bw, bh, kLabel, bh / 2.0f);
+    DrawIcon(ui, kIconA, m_a.x, m_a.y, 2.0f * m_a.r * kCell, m_pressed & Bit(A));
+    DrawIcon(ui, kIconB, m_b.x, m_b.y, 2.0f * m_b.r * kCell, m_pressed & Bit(B));
+    // L and R: their shoulder buttons, as tall as their (wider) spot and a bit more.
+    for (const auto &[rect, icon, bit] : {std::tuple{&m_l, kIconL, Bit(L)}, std::tuple{&m_r, kIconR, Bit(R)}})
+        DrawIcon(ui, icon, rect->x + rect->w / 2.0f, rect->y + rect->h / 2.0f, std::min(rect->w, rect->h * 1.3f) * kCell,
+                 m_pressed & bit);
+    // Select and Start: the Switch's - and +, named underneath.
+    for (const auto &[rect, icon, bit, label] :
+         {std::tuple{&m_select, kIconMinus, Bit(Select), "SELECT"}, std::tuple{&m_start, kIconPlus, Bit(Start), "START"}})
+    {
+        const float size = std::min(rect->w, rect->h * 1.1f);
+        const float cx = rect->x + rect->w / 2.0f, cy = rect->y + rect->h / 2.0f - rect->h * 0.12f;
+        DrawIcon(ui, icon, cx, cy, size * kCell, m_pressed & bit);
+        if (m_smallFont.IsValid())
+        {
+            const float scale = std::min(1.0f, rect->h / (28.0f * m_dp)) * 0.8f;
+            ui.DrawText(m_smallFont, label, cx - ui.GetTextWidth(m_smallFont, label) * scale / 2.0f,
+                        cy + size / 2.0f + 1.0f * m_dp - ui.GetFontPStart(m_smallFont) * scale, scale,
+                        XrColor4f{1.0f, 1.0f, 1.0f, 0.55f});
+        }
+    }
+    DrawIcon(ui, kIconHome, m_menu.x, m_menu.y, 2.0f * m_menu.r * kCell, m_menuDown);
 }

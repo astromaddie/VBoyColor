@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <deque>
 #include <future>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -96,7 +97,7 @@ public:
     void SetOnlyPacks(bool onlyPacks);
     bool IsOnlyPacks() const { return m_onlyPacks; }
     // Games whose pack isn't checked yet this session.
-    bool CheckingPacks() const { return !m_packQueue.empty(); }
+    bool CheckingPacks() const { return !m_packQueue.empty() || (m_check.valid() && m_checkIsPack); }
     // Bumped whenever Games() changes (rescan, order) - for anything that
     // keeps per-game data by index.
     int Version() const { return m_version; }
@@ -119,8 +120,8 @@ private:
     };
     void LoadArchive();
     void SaveArchive();
-    // Checks the next game waiting; gives the emulator its input when its
-    // thumbnail needs making.
+    // Starts checking the next game waiting (see m_check): whether it has a
+    // pack, and what its title screen would be made from.
     void CheckNext();
     void Upload(Game &game, const std::vector<uint8_t> &rgb, bool box);
     Game *Find(const std::string &name);
@@ -186,4 +187,24 @@ private:
         std::vector<uint8_t> png; // empty: it wasn't a picture
     };
     std::future<Card> m_card;
+
+    // A game's check (CheckNext, CheckPackNext) runs on a thread of its own:
+    // reading its ROM, its colors and finding its pack go through the
+    // system's folder access - on Android a tenth of a second or more per
+    // game, which on the render thread made the library stutter for seconds
+    // after the app started. One at a time; FinishCheck takes in what it found.
+    struct Checked
+    {
+        std::string name;
+        bool packOnly = false; // only whether it has a pack (CheckPackNext)
+        bool read = false;     // its ROM could be read
+        bool hasPack = false;
+        std::string key;       // what its title screen would be made from
+        Emulator::ThumbnailInput input;
+    };
+    void FinishCheck(Checked checked);
+    std::future<Checked> m_check;
+    bool m_checkIsPack = false;
+    std::optional<Checked> m_toMake; // checked, its title screen to make once the worker's free
+    std::future<void> m_saving;      // the file being written (SaveArchive)
 };
