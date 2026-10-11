@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <sstream>
 
 namespace
 {
@@ -16,6 +18,12 @@ namespace
     const XrColor4f kFillDark{0.0f, 0.0f, 0.0f, 0.22f};
     const XrColor4f kPressed{0.97f, 0.77f, 0.27f, 0.60f};
     const XrColor4f kLabel{1.0f, 1.0f, 1.0f, 0.78f};
+    const XrColor4f kEditBox{0.97f, 0.77f, 0.27f, 0.22f};
+    const XrColor4f kEditBar{0.08f, 0.09f, 0.12f, 0.88f};
+
+    constexpr const char *kLayoutFile = "touch-layout.txt";
+    // (every label the small font draws)
+    constexpr const char *kSmallGlyphs = "SELECTSTARTSMALLERBIGGERRESETDONEBACK TO GAME";
 
     bool InCircle(float cx, float cy, float r, float x, float y) { return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r; }
 
@@ -36,7 +44,8 @@ void TouchControls::Initialize(UiRenderer &ui, Platform &platform)
     m_smallFont = ui.LoadFont(m_fontBytes, 28);
     m_fontDp = 2.625f;
     ui.EnsureGlyphsForText(m_font, "ABLR");
-    ui.EnsureGlyphsForText(m_smallFont, "SELECTSTART");
+    ui.EnsureGlyphsForText(m_smallFont, kSmallGlyphs);
+    Load(platform);
 }
 
 bool TouchControls::UsesRightDpad(const std::string &romName)
@@ -62,7 +71,7 @@ void TouchControls::Layout(float w, float h, float dp, bool rightDpad)
         m_ui->RebakeFont(m_font, m_fontBytes, static_cast<int>(std::lround(20.0f * dp)));
         m_ui->RebakeFont(m_smallFont, m_fontBytes, static_cast<int>(std::lround(10.5f * dp)));
         m_ui->EnsureGlyphsForText(m_font, "ABLR");
-        m_ui->EnsureGlyphsForText(m_smallFont, "SELECTSTART");
+        m_ui->EnsureGlyphsForText(m_smallFont, kSmallGlyphs);
     }
 
     const float pad = 132.0f * dp; // a D-pad's size
@@ -92,13 +101,15 @@ void TouchControls::Layout(float w, float h, float dp, bool rightDpad)
         m_b = {rx - buttonR - 8.0f * dp, by + 14.0f * dp, buttonR};
         m_a = {rx + buttonR + 8.0f * dp, by - 14.0f * dp, buttonR};
         m_menu = {w / 2.0f, top + shoulderH / 2.0f, 17.0f * dp};
+        ApplyAdjust();
         return;
     }
 
-    // Landscape: the screen between the two sides, as big as fits - or, on a
-    // screen too square for that (a tablet), as big as the whole screen with
-    // the controls over its sides.
-    const float side = pad + 28.0f * dp;
+    // Landscape: the screen between the two sides, as big as fits with the
+    // controls reaching at most a little over its edges - or, on a screen too
+    // square for that (a tablet), as big as the whole screen with the
+    // controls over its sides.
+    const float side = pad + 28.0f * dp - 48.0f * dp;
     float s = std::min((w - 2.0f * side) / kVbWidth, h / kVbHeight);
     const bool overlay = s * kVbHeight < 0.72f * h;
     if (overlay)
@@ -108,7 +119,7 @@ void TouchControls::Layout(float w, float h, float dp, bool rightDpad)
     m_screenX = std::floor((w - m_screenW) / 2.0f);
     m_screenY = std::floor((h - m_screenH) / 2.0f);
 
-    const float lx = overlay ? side / 2.0f : std::max(side / 2.0f, m_screenX / 2.0f);
+    const float lx = std::max(pad / 2.0f + margin, overlay ? 0.0f : m_screenX / 2.0f);
     const float rx = w - lx;
     m_l = {lx - shoulderW / 2.0f, margin, shoulderW, shoulderH};
     m_r = {rx - shoulderW / 2.0f, margin, shoulderW, shoulderH};
@@ -130,8 +141,262 @@ void TouchControls::Layout(float w, float h, float dp, bool rightDpad)
     m_b = {rx - buttonR - 7.0f * dp, by + 14.0f * dp, buttonR};
     m_a = {rx + buttonR + 7.0f * dp, by - 14.0f * dp, buttonR};
 
-    // The menu: small, at the top in the middle.
-    m_menu = {w / 2.0f, margin + 15.0f * dp, 16.0f * dp};
+    // The menu: small, at the bottom left - under Select and Start, off the
+    // game's picture.
+    const float menuR = 16.0f * dp;
+    m_menu = {lx, std::min(pillY + pillH + margin + menuR, h - margin - menuR), menuR};
+    ApplyAdjust();
+}
+
+void TouchControls::ApplyAdjust()
+{
+    const bool portrait = m_h > m_w;
+    const float margin = 6.0f * m_dp;
+    auto center = [&](float &x, float &y, const Adjust &a)
+    {
+        x = std::clamp(x + a.dx * m_w, margin, m_w - margin);
+        y = std::clamp(y + a.dy * m_h, margin, m_h - margin);
+    };
+    auto circle = [&](Circle &c, const Adjust &a)
+    {
+        center(c.x, c.y, a);
+        c.r *= a.scale;
+    };
+    auto rect = [&](Rect &r, const Adjust &a)
+    {
+        float cx = r.x + r.w / 2.0f, cy = r.y + r.h / 2.0f;
+        center(cx, cy, a);
+        r.w *= a.scale;
+        r.h *= a.scale;
+        r.x = cx - r.w / 2.0f;
+        r.y = cy - r.h / 2.0f;
+    };
+    const Adjust *a = m_adjust[portrait ? 1 : 0];
+    circle(m_leftPad, a[kLeftPad]);
+    circle(m_rightPad, a[kRightPad]);
+    circle(m_a, a[kA]);
+    circle(m_b, a[kB]);
+    rect(m_l, a[kL]);
+    rect(m_r, a[kR]);
+    rect(m_select, a[kSelect]);
+    rect(m_start, a[kStart]);
+    circle(m_menu, a[kMenu]);
+
+    // The edit bar: four pills along the top.
+    const float gap = 8.0f * m_dp, bh = 32.0f * m_dp;
+    const float bw = std::min(104.0f * m_dp, (m_w - 5.0f * gap) / 4.0f);
+    const float bx = (m_w - 4.0f * bw - 3.0f * gap) / 2.0f;
+    m_editSmaller = {bx, gap, bw, bh};
+    m_editBigger = {bx + (bw + gap), gap, bw, bh};
+    m_editReset = {bx + 2.0f * (bw + gap), gap, bw, bh};
+    m_editDone = {bx + 3.0f * (bw + gap), gap, bw, bh};
+}
+
+void TouchControls::ElementBox(int element, float &x, float &y, float &w, float &h) const
+{
+    auto ofCircle = [&](const Circle &c)
+    {
+        x = c.x - c.r;
+        y = c.y - c.r;
+        w = h = 2.0f * c.r;
+    };
+    auto ofRect = [&](const Rect &r)
+    {
+        x = r.x;
+        y = r.y;
+        w = r.w;
+        h = r.h;
+    };
+    switch (element)
+    {
+    case kLeftPad: ofCircle(m_leftPad); break;
+    case kRightPad: ofCircle(m_rightPad); break;
+    case kA: ofCircle(m_a); break;
+    case kB: ofCircle(m_b); break;
+    case kL: ofRect(m_l); break;
+    case kR: ofRect(m_r); break;
+    case kSelect: ofRect(m_select); break;
+    case kStart: ofRect(m_start); break;
+    default: ofCircle(m_menu); break;
+    }
+}
+
+int TouchControls::ElementAt(float px, float py) const
+{
+    // (the small ones first - they may sit over a D-pad's reach)
+    static constexpr int kOrder[] = {kMenu, kA, kB, kL, kR, kSelect, kStart, kRightPad, kLeftPad};
+    const float slack = 8.0f * m_dp;
+    for (int e : kOrder)
+    {
+        if (e == kRightPad && !m_rightDpad)
+            continue;
+        float x, y, w, h;
+        ElementBox(e, x, y, w, h);
+        if (px >= x - slack && px <= x + w + slack && py >= y - slack && py <= y + h + slack)
+            return e;
+    }
+    return -1;
+}
+
+void TouchControls::MoveElement(int element, float dx, float dy)
+{
+    if (element < 0 || m_w <= 0 || m_h <= 0)
+        return;
+    Adjust &a = AdjustOf(element);
+    a.dx = std::clamp(a.dx + dx / m_w, -1.0f, 1.0f);
+    a.dy = std::clamp(a.dy + dy / m_h, -1.0f, 1.0f);
+}
+
+void TouchControls::BeginEdit()
+{
+    m_editing = true;
+    m_visible = true;
+    m_selected = -1;
+    m_dragId = -1;
+    m_lastIds.clear();
+    m_editFresh = true;
+}
+
+bool TouchControls::UpdateEdit(const std::vector<Touch> &touches)
+{
+    auto inRect = [](const Rect &r, float x, float y) { return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; };
+    if (m_editFresh)
+    {
+        // (the finger that tapped Edit in the menu may still be down - it
+        // doesn't count)
+        m_editFresh = false;
+        m_lastIds.clear();
+        for (const Touch &t : touches)
+            m_lastIds.push_back(t.id);
+        return false;
+    }
+    bool done = false;
+    std::vector<int> ids;
+    bool dragging = false;
+    for (const Touch &t : touches)
+    {
+        ids.push_back(t.id);
+        const bool fresh = std::find(m_lastIds.begin(), m_lastIds.end(), t.id) == m_lastIds.end();
+        if (fresh)
+        {
+            if (inRect(m_editDone, t.x, t.y))
+                done = true;
+            else if (inRect(m_editReset, t.x, t.y))
+            {
+                for (Adjust &a : m_adjust[m_h > m_w ? 1 : 0])
+                    a = Adjust{};
+                m_selected = -1;
+            }
+            else if (inRect(m_editSmaller, t.x, t.y) || inRect(m_editBigger, t.x, t.y))
+            {
+                if (m_selected >= 0)
+                {
+                    Adjust &a = AdjustOf(m_selected);
+                    a.scale = std::clamp(a.scale * (inRect(m_editBigger, t.x, t.y) ? 1.1f : 1.0f / 1.1f), 0.5f, 2.0f);
+                }
+            }
+            else
+            {
+                m_selected = ElementAt(t.x, t.y);
+                m_dragId = m_selected >= 0 ? t.id : -1;
+                m_dragX = t.x;
+                m_dragY = t.y;
+            }
+        }
+        if (t.id == m_dragId)
+        {
+            dragging = true;
+            MoveElement(m_selected, t.x - m_dragX, t.y - m_dragY);
+            m_dragX = t.x;
+            m_dragY = t.y;
+        }
+    }
+    if (!dragging)
+        m_dragId = -1;
+    m_lastIds = ids;
+    return done;
+}
+
+void TouchControls::DrawEdit(UiRenderer &ui) const
+{
+    // The controls, each with its box; the chosen one stands out.
+    for (int e = 0; e < kElementCount; ++e)
+    {
+        if (e == kRightPad && !m_rightDpad)
+            continue;
+        float x, y, w, h;
+        ElementBox(e, x, y, w, h);
+        const float pad = 3.0f * m_dp;
+        ui.DrawQuadRounded(x - pad, y - pad, w + 2 * pad, h + 2 * pad, e == m_selected ? kPressed : kEditBox, 6.0f * m_dp);
+    }
+    TouchControls shown = *this;
+    shown.m_pressed = 0;
+    shown.m_visible = true;
+    shown.Draw(ui);
+    const float barPad = 4.0f * m_dp;
+    ui.DrawQuadRounded(m_editSmaller.x - barPad, m_editSmaller.y - barPad,
+                       m_editDone.x + m_editDone.w - m_editSmaller.x + 2 * barPad, m_editDone.h + 2 * barPad, kEditBar,
+                       (m_editDone.h + 2 * barPad) / 2.0f);
+    DrawPill(ui, m_editSmaller, "SMALLER", false, m_smallFont);
+    DrawPill(ui, m_editBigger, "BIGGER", false, m_smallFont);
+    DrawPill(ui, m_editReset, "RESET", false, m_smallFont);
+    DrawPill(ui, m_editDone, "DONE", true, m_smallFont);
+}
+
+void TouchControls::LayoutResume(float menuRight, float menuTop)
+{
+    const float gap = 10.0f * m_dp, w = 128.0f * m_dp, h = 34.0f * m_dp;
+    if (m_w - menuRight >= w + 2.0f * gap)
+        m_resume = {menuRight + (m_w - menuRight - w) / 2.0f, std::max(gap, menuTop + gap), w, h};
+    else
+        m_resume = {m_w - w - gap, gap, w, h};
+}
+
+bool TouchControls::UpdateResume(const std::vector<Touch> &touches)
+{
+    bool down = false;
+    for (const Touch &t : touches)
+        if (t.x >= m_resume.x && t.x <= m_resume.x + m_resume.w && t.y >= m_resume.y && t.y <= m_resume.y + m_resume.h)
+            down = true;
+    const bool tapped = down && !m_resumeDown;
+    m_resumeDown = down;
+    return tapped;
+}
+
+void TouchControls::DrawResume(UiRenderer &ui) const
+{
+    ui.DrawQuadRounded(m_resume.x, m_resume.y, m_resume.w, m_resume.h, kEditBar, m_resume.h / 2.0f);
+    DrawPill(ui, m_resume, "BACK TO GAME", m_resumeDown, m_smallFont);
+}
+
+void TouchControls::Load(Platform &platform)
+{
+    const std::vector<uint8_t> bytes = platform.ReadRomsFile(kLayoutFile, true);
+    std::istringstream in(std::string(bytes.begin(), bytes.end()));
+    std::string word;
+    int version = 0;
+    if (!(in >> word >> version) || word != "vboycolor-touch-layout" || version != 1)
+        return;
+    int orientation = 0, element = 0;
+    Adjust a;
+    while (in >> orientation >> element >> a.dx >> a.dy >> a.scale)
+        if (orientation >= 0 && orientation < 2 && element >= 0 && element < kElementCount)
+            m_adjust[orientation][element] = {std::clamp(a.dx, -1.0f, 1.0f), std::clamp(a.dy, -1.0f, 1.0f),
+                                              std::clamp(a.scale, 0.5f, 2.0f)};
+}
+
+void TouchControls::Save(Platform &platform) const
+{
+    std::string text = "vboycolor-touch-layout 1\n";
+    char line[96];
+    for (int o = 0; o < 2; ++o)
+        for (int e = 0; e < kElementCount; ++e)
+        {
+            const Adjust &a = m_adjust[o][e];
+            std::snprintf(line, sizeof(line), "%d %d %.5f %.5f %.4f\n", o, e, a.dx, a.dy, a.scale);
+            text += line;
+        }
+    platform.WriteRomsFile(kLayoutFile, true, text.data(), text.size());
 }
 
 void TouchControls::ScreenArea(float &x, float &y, float &w, float &h) const

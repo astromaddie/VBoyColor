@@ -58,11 +58,42 @@ enum class Screen3D
     RedCyan = 5,
     GreenMagenta = 6,
     AmberBlue = 7,
+    TopBottomFull = 8,  // one above the other, each eye at its own shape
 };
-inline constexpr int kScreen3DCount = 8;
+inline constexpr int kScreen3DCount = 9;
 // The anaglyph glasses (1 red/cyan, 2 green/magenta, 3 amber/blue - see
 // shaders/anaglyph.frag), 0 for the other modes.
-constexpr int AnaglyphOf(int screen3D) { return screen3D >= 5 && screen3D < kScreen3DCount ? screen3D - 4 : 0; }
+constexpr int AnaglyphOf(int screen3D) { return screen3D >= 5 && screen3D <= 7 ? screen3D - 4 : 0; }
+
+// The menu shows 3D as two rows: the kind (off, side by side, top and
+// bottom, colored glasses) and the kind's format (or glasses).
+enum class Screen3DKind
+{
+    Off = 0,
+    SideBySide = 1,
+    TopBottom = 2,
+    Glasses = 3,
+};
+inline constexpr int kScreen3DKindCount = 4;
+constexpr Screen3DKind KindOf(int screen3D)
+{
+    switch (static_cast<Screen3D>(screen3D))
+    {
+    case Screen3D::SideBySideHalf:
+    case Screen3D::SideBySideFull:
+    case Screen3D::CrossEyed:
+        return Screen3DKind::SideBySide;
+    case Screen3D::TopBottom:
+    case Screen3D::TopBottomFull:
+        return Screen3DKind::TopBottom;
+    case Screen3D::RedCyan:
+    case Screen3D::GreenMagenta:
+    case Screen3D::AmberBlue:
+        return Screen3DKind::Glasses;
+    default:
+        return Screen3DKind::Off;
+    }
+}
 
 struct AppSettings
 {

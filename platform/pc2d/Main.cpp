@@ -205,6 +205,10 @@ namespace
             panes[0] = {0.0f, 0.0f, fw, fh, 1.0f, 0.5f, Emulator::Eye::Left};
             panes[1] = {0.0f, halfH, fw, fh, 1.0f, 0.5f, Emulator::Eye::Right};
             return 2;
+        case Screen3D::TopBottomFull:
+            panes[0] = {0.0f, 0.0f, fw, halfH, 1.0f, 1.0f, Emulator::Eye::Left};
+            panes[1] = {0.0f, halfH, fw, halfH, 1.0f, 1.0f, Emulator::Eye::Right};
+            return 2;
         default: // off, or colored glasses (one picture of both)
             panes[0] = {0.0f, 0.0f, fw, fh, 1.0f, 1.0f, Emulator::Eye::Left};
             return 1;
@@ -637,12 +641,21 @@ int main(int argc, char **argv)
             }
             f5WasPressed = f5Pressed;
             const bool f4Pressed = glfwGetKey(window, GLFW_KEY_F4) == GLFW_PRESS;
-            if (f4Pressed && !f4WasPressed)
+            const bool shiftDown = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                                   glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+            if (f4Pressed && !f4WasPressed && shiftDown)
+            {
+                // Shift+F4 (dev): the touch controls' edit mode, as the phone's.
+                g_touchPreview = true;
+                touch.BeginEdit();
+            }
+            else if (f4Pressed && !f4WasPressed)
             {
                 g_touchPreview = !g_touchPreview;
                 std::printf("Touch controls preview %s\n", g_touchPreview ? "on (the mouse is a finger)" : "off");
             }
             f4WasPressed = f4Pressed;
+
             // (a phone's density: the window's height as a phone's ~400 dp)
             touch.Layout(static_cast<float>(fbWidth), static_cast<float>(fbHeight), fbHeight / 400.0f,
                          TouchControls::UsesRightDpad(emulator.RomName()));
@@ -659,7 +672,16 @@ int main(int argc, char **argv)
                     touches.push_back({0, static_cast<float>(cx) * fbWidth / std::max(1, ww), static_cast<float>(cy) * fbHeight / std::max(1, wh)});
                 }
                 bool menuPressed = false;
-                touchBits = touch.Update(touches, menuPressed);
+                if (touch.Editing())
+                {
+                    if (touch.UpdateEdit(touches))
+                    {
+                        touch.EndEdit();
+                        touch.Save(platform);
+                    }
+                }
+                else
+                    touchBits = touch.Update(touches, menuPressed);
                 if (menuPressed && emulator.HasGame())
                     appMenu.Show();
             }
@@ -863,7 +885,12 @@ int main(int argc, char **argv)
                 }
             }
             if (g_touchPreview && !appMenu.IsVisible())
-                touch.Draw(uiRenderer);
+            {
+                if (touch.Editing())
+                    touch.DrawEdit(uiRenderer);
+                else
+                    touch.Draw(uiRenderer);
+            }
             if (appMenu.IsVisible())
                 for (int i = 0; i < paneCount; ++i)
                     appMenu.Draw(uiRenderer, panes[i].ox + menuX * panes[i].qx, panes[i].oy + menuY * panes[i].qy, panes[i].qx,

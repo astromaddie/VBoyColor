@@ -93,6 +93,8 @@ public:
     // OpenXrApp::UpdateBatteryPercent); it stays hidden on both desktop
     // builds, which have no battery worth reading.
     void SetBatteryPercent(int percent) { m_batteryPercent = percent; }
+    // The phone app's touch controls editor (Settings > Touch controls).
+    void SetEditTouchControls(std::function<void()> edit) { m_resources.editTouchControls = std::move(edit); }
 
     // Menu open/closed - closing lets the emulator screen show unobstructed
     // instead of always sitting under the menu panel. "Resume" and picking a

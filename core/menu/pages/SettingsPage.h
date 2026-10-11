@@ -54,14 +54,16 @@ private:
     void RefreshLabels(bool save = true);
     void RequestChangeRomsFolder();
     void ChangeLook(int delta);
-    void Change3D(int delta);
+    void Change3D(int delta);       // the kind (off, side by side, top and bottom, glasses)
+    void Change3DFormat(int delta); // the kind's format / glasses
 
     std::shared_ptr<MenuList::Entry> m_colorModeEntry;
     std::shared_ptr<MenuList::Entry> m_paletteEntry;
     std::shared_ptr<MenuList::Entry> m_rebuildEntry;
     std::shared_ptr<MenuList::Entry> m_lookEntry;
     std::shared_ptr<MenuList::Entry> m_sizeEntry; // (the PC window only)
-    std::shared_ptr<MenuList::Entry> m_threeDEntry; // (flat screens only)
+    std::shared_ptr<MenuList::Entry> m_threeDEntry;       // (flat screens only)
+    std::shared_ptr<MenuList::Entry> m_threeDFormatEntry; // (its second row - hidden while 3D is off)
     std::shared_ptr<MenuList::Entry> m_folderEntries[kDataKindCount]; // (where Platform::SupportsDataFolders)
     std::shared_ptr<MenuList::Entry> m_colorREntry;
     std::shared_ptr<MenuList::Entry> m_colorGEntry;

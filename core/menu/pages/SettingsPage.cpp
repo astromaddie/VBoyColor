@@ -108,6 +108,14 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
     list->AddEntry("Button mapping", [this](MenuItem *)
                    { if (emulatorButtonMapPage) Navigate(emulatorButtonMapPage, 1); }, nullptr, nullptr, UiIconId::Mapping)
         ->opensPage = true;
+    // The phone: move the on-screen controls (see TouchControls' edit mode).
+    if (resources.buttonMappingProfile == ButtonMappingProfile::Phone)
+    {
+        const std::function<void()> *edit = &resources.editTouchControls;
+        list->AddEntry("Touch controls", [edit](MenuItem *)
+                       { if (*edit) (*edit)(); }, nullptr, nullptr, UiIconId::Move)
+            ->SetValue("Edit");
+    }
     // (a flat window or phone has no screen to place)
     if (resources.buttonMappingProfile == ButtonMappingProfile::Vr)
         list->AddEntry("Adjust screen", [this](MenuItem *)
@@ -153,6 +161,9 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
         // A flat screen's 3D (see Screen3D): 3D TVs and monitors, colored glasses.
         m_threeDEntry = list->AddEntry("3D", [this](MenuItem *) { Change3D(1); }, [this](MenuItem *) { Change3D(-1); },
                                        [this](MenuItem *) { Change3D(1); }, UiIconId::ThreeD);
+        m_threeDFormatEntry = list->AddEntry("Format", [this](MenuItem *) { Change3DFormat(1); },
+                                             [this](MenuItem *) { Change3DFormat(-1); },
+                                             [this](MenuItem *) { Change3DFormat(1); });
     }
 
     list->AddHeader("Library");
@@ -320,11 +331,56 @@ void SettingsPage::ChangeLook(int delta)
     RefreshLabels();
 }
 
+namespace
+{
+    // Each 3D kind's modes, in the order its second row steps through them.
+    struct Screen3DFormats
+    {
+        const Screen3D *modes;
+        const char *const *names;
+        int count;
+    };
+    Screen3DFormats FormatsOf(Screen3DKind kind)
+    {
+        static constexpr Screen3D kSbs[] = {Screen3D::SideBySideHalf, Screen3D::SideBySideFull, Screen3D::CrossEyed};
+        static constexpr const char *kSbsNames[] = {"3D TV (squeezed)", "Full", "Cross-eyed"};
+        static constexpr Screen3D kTb[] = {Screen3D::TopBottom, Screen3D::TopBottomFull};
+        static constexpr const char *kTbNames[] = {"3D TV (squeezed)", "Full"};
+        static constexpr Screen3D kGlasses[] = {Screen3D::RedCyan, Screen3D::GreenMagenta, Screen3D::AmberBlue};
+        static constexpr const char *kGlassesNames[] = {"Red / cyan", "Green / magenta", "Amber / blue"};
+        switch (kind)
+        {
+        case Screen3DKind::SideBySide: return {kSbs, kSbsNames, 3};
+        case Screen3DKind::TopBottom: return {kTb, kTbNames, 2};
+        case Screen3DKind::Glasses: return {kGlasses, kGlassesNames, 3};
+        default: return {nullptr, nullptr, 0};
+        }
+    }
+} // namespace
+
 void SettingsPage::Change3D(int delta)
 {
     if (!m_settings)
         return;
-    m_settings->screen3D = (m_settings->screen3D + delta + kScreen3DCount) % kScreen3DCount;
+    // The next kind, at its first format (3D TV / red-cyan).
+    const int kind = (static_cast<int>(KindOf(m_settings->screen3D)) + delta + kScreen3DKindCount) % kScreen3DKindCount;
+    const Screen3DFormats formats = FormatsOf(static_cast<Screen3DKind>(kind));
+    m_settings->screen3D = static_cast<int>(formats.count ? formats.modes[0] : Screen3D::Off);
+    RefreshLabels();
+}
+
+void SettingsPage::Change3DFormat(int delta)
+{
+    if (!m_settings)
+        return;
+    const Screen3DFormats formats = FormatsOf(KindOf(m_settings->screen3D));
+    if (!formats.count)
+        return;
+    int at = 0;
+    for (int i = 0; i < formats.count; ++i)
+        if (static_cast<int>(formats.modes[i]) == m_settings->screen3D)
+            at = i;
+    m_settings->screen3D = static_cast<int>(formats.modes[(at + delta + formats.count) % formats.count]);
     RefreshLabels();
 }
 
@@ -365,10 +421,18 @@ void SettingsPage::RefreshLabels(bool save)
         }
     if (m_threeDEntry)
     {
-        static constexpr const char *k3DNames[kScreen3DCount] = {
-            "Off", "Side by side (3D TV)", "Side by side (full)", "Cross-eyed", "Top and bottom",
-            "Red / cyan glasses", "Green / magenta glasses", "Amber / blue glasses"};
-        m_threeDEntry->SetValue(k3DNames[std::clamp(m_settings->screen3D, 0, kScreen3DCount - 1)]);
+        static constexpr const char *kKinds[kScreen3DKindCount] = {"Off", "Side by side", "Top and bottom", "Colored glasses"};
+        const Screen3DKind kind = KindOf(m_settings->screen3D);
+        m_threeDEntry->SetValue(kKinds[static_cast<int>(kind)]);
+        const Screen3DFormats formats = FormatsOf(kind);
+        m_threeDFormatEntry->Visible = formats.count > 0;
+        if (formats.count)
+        {
+            m_threeDFormatEntry->SetText(kind == Screen3DKind::Glasses ? "Glasses" : "Format");
+            for (int i = 0; i < formats.count; ++i)
+                if (static_cast<int>(formats.modes[i]) == m_settings->screen3D)
+                    m_threeDFormatEntry->SetValue(formats.names[i]);
+        }
     }
     // 2 decimals, not 3 - kColorStep is 0.05, so the third decimal is always
     // 0 and never actually reachable by adjusting the value.

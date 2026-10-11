@@ -3,6 +3,8 @@
 #include "gfx/UiFontManager.h" // UiFontHandle
 #include "gfx/UiIconSet.h"
 
+#include <functional>
+
 class Emulator;
 class AppMenu;
 struct AppSettings;
@@ -49,4 +51,8 @@ struct UiMenuResources
     ThumbnailLibrary *thumbnails = nullptr;
     // Is there a newer VBoy Color (owned by AppMenu - see io/Updater.h).
     Updater *updater = nullptr;
+    // The phone app: Settings > Touch controls > Edit (the app closes the
+    // menu and lets the player move the on-screen controls). Set by the app
+    // (AppMenu::SetEditTouchControls) - empty elsewhere.
+    std::function<void()> editTouchControls;
 };

@@ -420,6 +420,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     bool ready = false; // the device, the renderer, the menu - once
     VkFence acquireFence = VK_NULL_HANDLE;
     bool settingsLoaded = false;
+    bool editRequested = false; // Settings > Touch controls > Edit
 
     uint32_t buttonStates[3]{}, lastButtonStates[3]{};
     bool menuComboWasHeld = false, backWasHeld = false;
@@ -502,6 +503,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                         appMenu.Initialize(uiRenderer, presenter.format.format, emulator, settings, platform,
                                            ButtonMappingProfile::Phone);
                         touch.Initialize(uiRenderer, platform);
+                        appMenu.SetEditTouchControls([&editRequested]() { editRequested = true; });
                         VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
                         CheckVk(vkCreateFence(renderer.GetDevice(), &fenceInfo, nullptr, &acquireFence), "vkCreateFence");
                         ready = true;
@@ -530,8 +532,20 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         const int32_t density = AConfiguration_getDensity(app->config);
         const float dp = (density > 0 && density < 0xfffe ? density : 160) / 160.0f;
 
+        // Editing the touch controls (asked for in the menu): the game waits,
+        // the controls show, the menu comes back when the player is done.
+        if (editRequested)
+        {
+            editRequested = false;
+            appMenu.Hide();
+            touch.BeginEdit();
+        }
+        const bool editing = touch.Editing();
+
         // The touch controls: hidden while a gamepad plays, back on a touch.
-        if (state.gamepadUsed)
+        if (editing)
+            touch.SetVisible(true);
+        else if (state.gamepadUsed)
             touch.SetVisible(false);
         else if (state.touched)
             touch.SetVisible(true);
@@ -540,9 +554,9 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             shownRom = emulator.RomName();
         touch.Layout(w, h, dp, TouchControls::UsesRightDpad(shownRom));
 
-        // The menu: as big as fits.
-        const int scaleX = static_cast<int>(w / kMenuWidth), scaleY = static_cast<int>(h / kMenuHeight);
-        const float menuScale = static_cast<float>(std::max(1, std::min(scaleX, scaleY)));
+        // The menu: as big as fits (not whole multiples: a phone's screen is
+        // much wider than the menu - this fills its height), its shape kept.
+        const float menuScale = std::max(1.0f, std::min(w / static_cast<float>(kMenuWidth), h / static_cast<float>(kMenuHeight)));
         appMenu.SetMenuScale(uiRenderer, menuScale);
         const float menuX = std::floor((w - kMenuWidth * menuScale) / 2.0f), menuY = std::floor((h - kMenuHeight * menuScale) / 2.0f);
 
@@ -560,6 +574,19 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         else
             appMenu.SetPointer(false, 0, 0, false);
 
+        if (editing)
+        {
+            const bool backTapped = state.backHeld && !backWasHeld;
+            backWasHeld = state.backHeld;
+            if (touch.UpdateEdit(touches) || backTapped)
+            {
+                touch.EndEdit();
+                touch.Save(platform);
+                appMenu.Show();
+            }
+        }
+        else
+        {
         // Menu buttons: the gamepad's, and Back as the menu's B.
         std::memcpy(lastButtonStates, buttonStates, sizeof(buttonStates));
         buttonStates[ButtonMapper::DeviceGamepad] = state.gamepadKeyBits | state.gamepadAxisBits;
@@ -580,6 +607,15 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         if (state.backHeld && !backWasHeld && !menuWasOpen && !appMenu.IsOpen() && emulator.HasGame())
             appMenu.Show();
         backWasHeld = state.backHeld;
+
+        // "Back to game" beside the menu (Back works too - not every phone
+        // hands the back gesture over in full screen).
+        if (appMenu.IsVisible() && emulator.HasGame())
+        {
+            touch.LayoutResume(menuX + kMenuWidth * menuScale, menuY);
+            if (touch.UpdateResume(touches))
+                appMenu.Hide();
+        }
 
         // Gamepad buttons for the mapping page.
         for (int bit = 0; bit < ButtonMapper::EmuButtonCount; ++bit)
@@ -605,6 +641,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             appMenu.ApplyGameplayInputSuppression(gameplay);
             emulator.SetGameplayInput(ButtonMapper::TranslateToVBBitmask(gameplay, settings.vbButtons) | touchBits);
             emulator.RunFrame(deltaSeconds);
+        }
         }
 
         // (the lifted fingers have been seen)
@@ -646,10 +683,11 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             const Screen3D mode = static_cast<Screen3D>(settings.screen3D);
             float sx = 0, sy = 0, sw = 0, sh = 0;
             if (mode == Screen3D::SideBySideHalf || mode == Screen3D::SideBySideFull || mode == Screen3D::CrossEyed ||
-                mode == Screen3D::TopBottom)
+                mode == Screen3D::TopBottom || mode == Screen3D::TopBottomFull)
             {
                 // A phone viewer or a 3D screen: the whole screen, one eye per half.
-                const bool topBottom = mode == Screen3D::TopBottom, half = mode == Screen3D::SideBySideHalf || topBottom;
+                const bool topBottom = mode == Screen3D::TopBottom || mode == Screen3D::TopBottomFull;
+                const bool half = mode == Screen3D::SideBySideHalf || mode == Screen3D::TopBottom;
                 const bool cross = mode == Screen3D::CrossEyed;
                 for (int eye = 0; eye < 2; ++eye)
                 {
@@ -662,6 +700,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                         sy = topBottom ? sy / 2.0f : sy;
                         sh = topBottom ? sh / 2.0f : sh;
                     }
+                    else if (topBottom)
+                        FitScreen(0, 0, w, std::floor(h / 2.0f), settings.screenWholePixels, sx, sy, sw, sh);
                     else
                         FitScreen(0, 0, std::floor(w / 2.0f), h, settings.screenWholePixels, sx, sy, sw, sh);
                     const Emulator::Eye which = (eye == 0) != cross ? Emulator::Eye::Left : Emulator::Eye::Right;
@@ -680,7 +720,13 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             }
         }
         if (appMenu.IsVisible())
+        {
             appMenu.Draw(uiRenderer, menuX, menuY);
+            if (emulator.HasGame())
+                touch.DrawResume(uiRenderer);
+        }
+        else if (editing)
+            touch.DrawEdit(uiRenderer);
         else
             touch.Draw(uiRenderer);
         uiRenderer.EndFrame();

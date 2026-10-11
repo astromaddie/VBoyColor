@@ -77,12 +77,12 @@ pack).*
 - **Screen placement** - size and distance of the screen in VR; on PC,
   Settings → Screen → Size: as big as the window allows (*Fit*) or *Whole
   pixels*.
-- **3D on a normal screen** (PC) - Settings → Screen → 3D: *side by side*
-  for 3D TVs and monitors (squeezed, as their Side-by-Side mode expects),
-  *side by side (full)* or *cross-eyed* for viewing without a TV's help,
-  *top and bottom*, or one picture for colored glasses - *red / cyan*,
-  *green / magenta* or *amber / blue* (mixed with Dubois' method, which keeps
-  the games' colors as true as the glasses allow).
+- **3D on a normal screen** (PC and phones) - Settings → Screen → 3D, then
+  its format: *side by side* (3D TV - squeezed, as a TV's Side-by-Side mode
+  expects -, full, or cross-eyed), *top and bottom* (3D TV or full), or
+  *colored glasses* - *red / cyan*, *green / magenta* or *amber / blue*
+  (mixed with Dubois' method, which keeps the games' colors as true as the
+  glasses allow).
 - **Your room as the background** (Quest) - Settings → Adjust screen →
   Show your room around it: the game floats in your room (passthrough)
   instead of in the dark.
@@ -128,11 +128,14 @@ The same `VBoyColor-<version>-quest-android-arm64.apk` works on phones, tablets
 and Android handhelds (Android 10 or newer, 64-bit ARM, with Vulkan - nearly
 every device from the last several years).
 Install it, open VBoy Color and pick the folder with your `.vb` ROMs when it
-asks. The Virtual Boy controller is on the screen: the left D-pad with
-Select and Start, B and A with the right D-pad above them (only in the games
-that use it - Red Alarm, Teleroboxer, 3-D Tetris and Golf), L and R on top,
-and the menu button at the top. Connect a gamepad and the on-screen buttons
-step aside until you touch the screen again. Back opens the menu.
+asks. The game fills the screen's height, with the Virtual Boy controller
+beside it: the left D-pad with Select and Start (and the menu button under
+them), B and A with the right D-pad above them (only in the games that use
+it - Red Alarm, Teleroboxer, 3-D Tetris and Golf), L and R on top. Settings →
+Touch controls → Edit lets you drag every control where you want it and
+make it bigger or smaller. Connect a gamepad and the on-screen buttons step
+aside until you touch the screen again. Back opens the menu, and Back (or
+*Back to game*) returns to the game.
 
 ### Windows
 
