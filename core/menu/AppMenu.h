@@ -170,7 +170,9 @@ private:
     void RenderContent(UiRenderer &ui);
     void DrawSidebar(UiRenderer &ui);
     void DrawHints(UiRenderer &ui);
+    void LoadLogo(UiRenderer &ui);
     void RebuildLogo(UiRenderer &ui);
+    int m_logoTries = 0;
 
     LibraryPage m_libraryPage;
     SaveStatesPage m_saveStatesPage;

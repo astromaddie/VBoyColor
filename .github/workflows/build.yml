@@ -1,6 +1,7 @@
-# Builds VBoy Color for Windows, Linux and Quest on every push and pull
-# request; a tag v* also publishes a GitHub release with the three downloads
-# (a pre-release for a tag with a dash, like v1.0.0-beta.1).
+# Builds VBoy Color for Windows, Linux and Quest/Android on pushes and pull
+# requests that change the app (see on: below); a tag v* also publishes a
+# GitHub release with the three downloads (a pre-release for a tag with a
+# dash, like v1.0.0-beta.1).
 #
 # A failed step reports the end of its log as an error annotation, so the
 # reason shows on the run's summary page.
@@ -16,11 +17,32 @@
 
 name: Build
 
+# Pushes that only touch the docs, pictures or dev-only scripts don't build
+# (a tag always does - paths aren't checked for tags); Actions > Build > Run
+# workflow builds by hand. A newer push stops the older one's build.
 on:
   push:
     branches: ["**"]
     tags: ["v*"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "images/**"
+      - "LICENSE"
+      - ".gitignore"
+      - "tools/**.py"
+      - "tools/**.ps1"
+      - "tools/harness/**"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "images/**"
+      - "LICENSE"
+      - ".gitignore"
+      - "tools/**.py"
+      - "tools/**.ps1"
+      - "tools/harness/**"
   workflow_dispatch:
 
 concurrency:

@@ -7,11 +7,29 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <ctime>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 namespace
 {
+    // A log line: logcat on Android (tag VBoyColor), stderr elsewhere.
+    void LogLine(const char *fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+#ifdef __ANDROID__
+        __android_log_vprint(ANDROID_LOG_INFO, "VBoyColor", fmt, args);
+#else
+        std::vfprintf(stderr, fmt, args);
+        std::fputc('\n', stderr);
+#endif
+        va_end(args);
+    }
+
     constexpr XrColor4f kClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
 
     // The logo's colors (Juan's VBoy Color logo): "VBOY" red, then "COLOR"
@@ -148,22 +166,7 @@ void AppMenu::Initialize(UiRenderer &ui, VkFormat targetFormat, Emulator &emulat
     m_icons.Load(ui, platform, m_menuScale);
     m_resources.icons = &m_icons;
 
-    // The logo, decoded once (RGBA) and resampled per menu scale.
-    {
-        const std::vector<uint8_t> png = platform.LoadAssetBytes("logo/vboycolor_icon.png");
-        int w = 0, h = 0, channels = 0;
-        if (stbi_uc *pixels = png.empty() ? nullptr : stbi_load_from_memory(png.data(), static_cast<int>(png.size()), &w, &h, &channels, 4))
-        {
-            m_logo.pixels.assign(pixels, pixels + static_cast<size_t>(w) * h * 4);
-            m_logo.width = static_cast<uint32_t>(w);
-            m_logo.height = static_cast<uint32_t>(h);
-            stbi_image_free(pixels);
-            m_logo.texHeight = static_cast<uint32_t>(std::ceil(kLogoHeight * kLogoMaxScale));
-            m_logo.texWidth = static_cast<uint32_t>(std::ceil(m_logo.texHeight * static_cast<float>(w) / h)) + 1;
-            m_logo.texture = ui.CreateStreamingImage(m_logo.texWidth, m_logo.texHeight, VK_FORMAT_B8G8R8A8_SRGB);
-            RebuildLogo(ui);
-        }
-    }
+    LoadLogo(ui);
 
     // The version beside the logo: "dev.155" over "v1.0.0" (a dev build),
     // "beta.2" over "v1.0.0", or just "v1.0.0".
@@ -228,6 +231,34 @@ void AppMenu::SetMenuScale(UiRenderer &ui, float scale)
     ui.ResizeRenderTexture(m_offscreenTexture, static_cast<uint32_t>(kMenuWidth * m_menuScale),
                            static_cast<uint32_t>(kMenuHeight * m_menuScale));
     LoadFonts(ui, true);
+    LoadLogo(ui); // (in case it didn't load the first time)
+    RebuildLogo(ui);
+}
+
+// The logo, decoded once (RGBA) and resampled per menu scale (RebuildLogo).
+void AppMenu::LoadLogo(UiRenderer &ui)
+{
+    if (m_logo.texture.IsValid() || m_logoTries >= 3)
+        return;
+    ++m_logoTries;
+    const std::vector<uint8_t> png = m_resources.platform->LoadAssetBytes("logo/vboycolor_icon.png");
+    int w = 0, h = 0, channels = 0;
+    stbi_uc *pixels = png.empty() ? nullptr : stbi_load_from_memory(png.data(), static_cast<int>(png.size()), &w, &h, &channels, 4);
+    if (!pixels || w <= 0 || h <= 0)
+    {
+        LogLine("[Menu] The logo didn't load (logo/vboycolor_icon.png: %zu bytes, %s)", png.size(),
+                png.empty() ? "not found" : stbi_failure_reason());
+        if (pixels)
+            stbi_image_free(pixels);
+        return;
+    }
+    m_logo.pixels.assign(pixels, pixels + static_cast<size_t>(w) * h * 4);
+    m_logo.width = static_cast<uint32_t>(w);
+    m_logo.height = static_cast<uint32_t>(h);
+    stbi_image_free(pixels);
+    m_logo.texHeight = static_cast<uint32_t>(std::ceil(kLogoHeight * kLogoMaxScale));
+    m_logo.texWidth = static_cast<uint32_t>(std::ceil(m_logo.texHeight * static_cast<float>(w) / h)) + 1;
+    m_logo.texture = ui.CreateStreamingImage(m_logo.texWidth, m_logo.texHeight, VK_FORMAT_B8G8R8A8_SRGB);
     RebuildLogo(ui);
 }
 
@@ -786,10 +817,20 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
         textX = kLogoX + w + 5.0f;
     }
     else
-        ui.DrawText(m_resources.bodyBoldFont, "VBoy Color", kLogoX, TextY(ui, m_resources.bodyBoldFont, kLogoY + 5.0f), 1.0f,
+    {
+        // (no logo: the name, the version under it - not over each other)
+        ui.DrawText(m_resources.bodyBoldFont, "VBoy Color", kLogoX, TextY(ui, m_resources.bodyBoldFont, kLogoY + 3.0f), 1.0f,
                     kMenuTextColor);
+        const std::string version = m_versionLine2.empty() ? m_versionLine1 : m_versionLine1 + "  " + m_versionLine2;
+        ui.DrawText(m_resources.captionFont, version, kLogoX, TextY(ui, m_resources.captionFont, kLogoY + 14.0f), 1.0f,
+                    kMenuDimTextColor);
+    }
     const float logoCenter = kLogoY + kLogoHeight / 2.0f;
-    if (m_versionLine2.empty())
+    if (textX == kLogoX)
+    {
+        // (no logo: drawn with the name, above)
+    }
+    else if (m_versionLine2.empty())
         ui.DrawText(m_resources.cardBoldFont, m_versionLine1, textX, TextY(ui, m_resources.cardBoldFont, logoCenter), 1.0f,
                     kMenuTextColor);
     else
