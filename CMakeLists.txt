@@ -253,6 +253,7 @@ add_library(vbgo_app STATIC
     core/menu/MenuPage.cpp
     core/menu/MenuWidgets.cpp
     core/menu/ThumbnailLibrary.cpp
+    core/menu/VirtualBoyFrame.cpp
     core/menu/pages/LibraryGrid.cpp
     core/menu/pages/LibraryPage.cpp
     core/menu/pages/SaveStatesPage.cpp
