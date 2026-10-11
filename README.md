@@ -236,6 +236,6 @@ Other components and fonts are listed in
   Ashley the Pikachu - RetroArch shaders that color the Virtual Boy, the Game
   Boy and the other monochrome handhelds, with side-by-side 3D for the
   Virtual Boy in VR. Thank you for keeping the colored Virtual Boy scene
-  going with your great work. No Super Bit Shader code is used.
+  going with your great work. Super Bit Shader implementation is WIP.
 - The libraries and fonts listed in
   [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
