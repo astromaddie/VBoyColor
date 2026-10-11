@@ -261,6 +261,7 @@ add_library(vbgo_app STATIC
     core/menu/pages/EmulatorButtonMapPage.cpp
     core/menu/pages/MoveScreenPage.cpp
     core/menu/pages/FolderPage.cpp
+    core/menu/pages/GameControlsPage.cpp
     core/emu/Emulator.cpp
     core/emu/ShadeColorizer.cpp
     core/emu/TileColorPack.cpp
@@ -273,6 +274,7 @@ add_library(vbgo_app STATIC
     core/input/XrInput.cpp
     core/input/ButtonMapping.cpp
     core/io/Settings.cpp
+    core/io/GameControls.cpp
     core/io/DataFolders.cpp
     core/io/Updater.cpp
     core/input/TouchControls.cpp

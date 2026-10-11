@@ -421,6 +421,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     VkFence acquireFence = VK_NULL_HANDLE;
     bool settingsLoaded = false;
     bool editRequested = false; // Settings > Touch controls > Edit
+    std::string editGame;       // ...a game's own (Library: hold its card), or ""
 
     uint32_t buttonStates[3]{}, lastButtonStates[3]{};
     bool menuComboWasHeld = false, backWasHeld = false;
@@ -503,7 +504,13 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                         appMenu.Initialize(uiRenderer, presenter.format.format, emulator, settings, platform,
                                            ButtonMappingProfile::Phone);
                         touch.Initialize(uiRenderer, platform);
-                        appMenu.SetEditTouchControls([&editRequested]() { editRequested = true; });
+                        appMenu.SetEditTouchControls(
+                            [&editRequested, &editGame](const std::string &game)
+                            {
+                                editGame = game;
+                                editRequested = true;
+                            },
+                            [&touch, &platform](const std::string &game) { touch.ForgetGameLayout(platform, game); });
                         VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
                         CheckVk(vkCreateFence(renderer.GetDevice(), &fenceInfo, nullptr, &acquireFence), "vkCreateFence");
                         ready = true;
@@ -538,8 +545,10 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         {
             editRequested = false;
             appMenu.Hide();
-            touch.BeginEdit();
+            touch.BeginEdit(platform, editGame);
         }
+        // (the game playing's own layout, if it has one)
+        touch.SetGame(platform, emulator.RomName());
         const bool editing = touch.Editing();
 
         // The touch controls: hidden while a gamepad plays, back on a touch.
@@ -552,7 +561,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         state.touched = false;
         if (emulator.RomName() != shownRom)
             shownRom = emulator.RomName();
-        touch.Layout(w, h, dp, TouchControls::UsesRightDpad(shownRom));
+        // (editing a game's own layout: that game's controls - its right D-pad or not)
+        touch.Layout(w, h, dp, TouchControls::UsesRightDpad(editing && !touch.LayoutGame().empty() ? touch.LayoutGame() : shownRom));
 
         // The menu: as big as fits (not whole multiples: a phone's screen is
         // much wider than the menu - this fills its height), its shape kept.
@@ -644,7 +654,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             // (the left stick moves like the D-pad, the triggers press like the bumpers)
             uint32_t gameplay[3] = {ButtonMapper::GamepadCompanionBits(buttonStates[ButtonMapper::DeviceGamepad]), 0, 0};
             appMenu.ApplyGameplayInputSuppression(gameplay);
-            emulator.SetGameplayInput(ButtonMapper::TranslateToVBBitmask(gameplay, settings.vbButtons) | touchBits);
+            emulator.SetGameplayInput(ButtonMapper::TranslateToVBBitmask(gameplay, appMenu.Controls().Buttons(settings)) | touchBits);
             emulator.RunFrame(deltaSeconds);
         }
         }

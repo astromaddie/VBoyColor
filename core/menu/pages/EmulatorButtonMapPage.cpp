@@ -2,6 +2,7 @@
 #include "emu/Emulator.h"
 #include "io/Platform.h"
 #include "io/Settings.h"
+#include "io/GameControls.h"
 #include "menu/MenuPage.h"
 #include "menu/pages/AppMenuLayout.h"
 
@@ -100,6 +101,7 @@ void EmulatorButtonMapPage::Init(UiRenderer &ui, const UiMenuResources &resource
     m_settings = resources.settings;
     m_platform = resources.platform;
     m_mappingProfile = resources.buttonMappingProfile;
+    m_gameControls = resources.gameControls;
 
     auto list = MakeList(ui, resources);
     // The icon identifies the emulated button; it is not either of the two
@@ -128,7 +130,12 @@ void EmulatorButtonMapPage::Init(UiRenderer &ui, const UiMenuResources &resource
 
     m_menu.MenuItems.push_back(list);
     m_list = list;
-    m_menu.BackPress = [this]() { if (settingsPage) Navigate(settingsPage, -1); };
+    m_menu.BackPress = [this]()
+    {
+        MenuPage *back = m_game.empty() ? settingsPage : m_gameBack;
+        if (back)
+            Navigate(back, -1);
+    };
     m_menu.Init();
 
     // Fill every untouched slot from the same table used by Reset Mapping.
@@ -158,7 +165,7 @@ void EmulatorButtonMapPage::StartCapture(int buttonIndex, int column)
     {
         if (*waitingForRelease)
             return;
-        m_settings->vbButtons[vbBit].Buttons[column] = button;
+        Target()[vbBit].Buttons[column] = button;
         RefreshLabels();
         SetCaptureHook(nullptr);
         SetRawCaptureHook(nullptr);
@@ -191,20 +198,23 @@ void EmulatorButtonMapPage::ApplyDefaultMapping(bool overwrite)
         return;
 
     if (overwrite)
-        for (auto &pair : m_settings->vbButtons)
-            pair = {};
+    {
+        ButtonMapper::MappedButtons *target = Target();
+        for (int i = 0; i < 16; ++i)
+            target[i] = {};
+    }
 
     using namespace ButtonMapper;
     auto bind = [this](uint32_t vbBit, int slot, int device, uint32_t button)
     {
-        ButtonMapper::MappedButton &binding = m_settings->vbButtons[vbBit].Buttons[slot];
+        ButtonMapper::MappedButton &binding = Target()[vbBit].Buttons[slot];
         if (!binding.IsSet)
             binding = {true, device, static_cast<int>(button)};
     };
 
     // Slot 1 is the gamepad: A/B by position in the window and phone apps,
     // by label in VR (see ButtonMapper::ApplyDefaultGamepadBindings).
-    ApplyDefaultGamepadBindings(m_settings->vbButtons, m_mappingProfile != ButtonMappingProfile::Vr);
+    ApplyDefaultGamepadBindings(Target(), m_mappingProfile != ButtonMappingProfile::Vr);
 
     if (m_mappingProfile == ButtonMappingProfile::Desktop)
     {
@@ -245,16 +255,43 @@ void EmulatorButtonMapPage::ApplyDefaultMapping(bool overwrite)
     }
 }
 
-void EmulatorButtonMapPage::RefreshLabels()
+EmulatorButtonMapPage::Mapping &EmulatorButtonMapPage::Target()
+{
+    return m_game.empty() ? m_settings->vbButtons : m_gameButtons;
+}
+
+void EmulatorButtonMapPage::OpenFor(const std::string &game, const std::string &title, MenuPage *back)
+{
+    m_game = game;
+    m_gameTitle = title;
+    m_gameBack = back;
+    if (!game.empty() && m_settings && m_platform && !GameControls::Load(*m_platform, game, m_gameButtons))
+        for (int i = 0; i < 16; ++i)
+            m_gameButtons[i] = m_settings->vbButtons[i]; // (from the general one, until it's changed)
+    if (!m_rowEntries.empty())
+        RefreshLabels(false);
+}
+
+void EmulatorButtonMapPage::RefreshLabels(bool save)
 {
     if (!m_settings)
         return;
     for (int i = 0; i < kButtonCount; ++i)
     {
-        const ButtonMapper::MappedButtons &pair = m_settings->vbButtons[kButtons[i].vbBit];
+        const ButtonMapper::MappedButtons &pair = Target()[kButtons[i].vbBit];
         m_rowEntries[i]->SetText(BindingStr(pair.Buttons[0], m_mappingProfile));
         m_rowEntries[i]->SetSecondaryText(BindingStr(pair.Buttons[1], m_mappingProfile));
     }
 
-    m_settings->Save(*m_platform); // always-on autosave - no explicit save action anywhere in the menu anymore
+    if (!save)
+        return;
+    // always-on autosave - no explicit save action anywhere in the menu anymore
+    if (m_game.empty())
+        m_settings->Save(*m_platform);
+    else
+    {
+        GameControls::Save(*m_platform, m_game, m_gameButtons);
+        if (m_gameControls)
+            m_gameControls->Reload(*m_platform);
+    }
 }

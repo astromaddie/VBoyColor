@@ -1,4 +1,5 @@
 #include "menu/pages/SettingsPage.h"
+#include "menu/pages/EmulatorButtonMapPage.h"
 #include "menu/pages/FolderPage.h"
 #include "emu/AutoColors.h"
 #include "emu/Emulator.h"
@@ -106,14 +107,20 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
 
     list->AddHeader("Controls");
     list->AddEntry("Button mapping", [this](MenuItem *)
-                   { if (emulatorButtonMapPage) Navigate(emulatorButtonMapPage, 1); }, nullptr, nullptr, UiIconId::Mapping)
+                   {
+                       if (!emulatorButtonMapPage)
+                           return;
+                       emulatorButtonMapPage->OpenFor("", "", nullptr); // (the general mapping)
+                       emulatorButtonMapPage->sidebarItem = sidebarItem;
+                       Navigate(emulatorButtonMapPage, 1);
+                   }, nullptr, nullptr, UiIconId::Mapping)
         ->opensPage = true;
     // The phone: move the on-screen controls (see TouchControls' edit mode).
     if (resources.buttonMappingProfile == ButtonMappingProfile::Phone)
     {
-        const std::function<void()> *edit = &resources.editTouchControls;
+        const std::function<void(const std::string &)> *edit = &resources.editTouchControls;
         list->AddEntry("Touch controls", [edit](MenuItem *)
-                       { if (*edit) (*edit)(); }, nullptr, nullptr, UiIconId::Move)
+                       { if (*edit) (*edit)(""); }, nullptr, nullptr, UiIconId::Move)
             ->SetValue("Edit");
     }
     // (a flat window or phone has no screen to place)

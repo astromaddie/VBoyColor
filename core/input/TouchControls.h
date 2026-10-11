@@ -60,13 +60,25 @@ public:
     // 3-D Tetris, Golf (and T&E Virtual Golf).
     static bool UsesRightDpad(const std::string &romName);
 
-    // The player's own layout (positions and sizes; the defaults until then).
+    // The player's own layout (positions and sizes; the defaults until then):
+    // the general one (touch-layout.txt), or a game's own (<game>.touch,
+    // made from the library - GameControlsPage). Save writes the one shown.
     void Load(Platform &platform);
     void Save(Platform &platform) const;
+    // The game playing ("" none): its own layout if it has one, else the
+    // general one - read when it changes. (Not while editing.)
+    void SetGame(Platform &platform, const std::string &game);
+    // Whose layout is shown: a game with its own, or "" (the general one).
+    const std::string &LayoutGame() const { return m_layoutGame; }
+    // A game has a layout of its own / give it back the general one.
+    static bool HasGameLayout(Platform &platform, const std::string &game);
+    void ForgetGameLayout(Platform &platform, const std::string &game);
 
     // Edit mode: every control shows; dragging one moves it, the bar at the
     // top makes the chosen one smaller or bigger, resets all, or finishes.
-    void BeginEdit();
+    // game: edit that game's own layout (it starts from what it has - its
+    // own or the general one); "" the general one.
+    void BeginEdit(Platform &platform, const std::string &game = "");
     bool Editing() const { return m_editing; }
     // Once a frame while editing: true when the player is done (the caller
     // saves - Save - and leaves edit mode - EndEdit).
@@ -150,6 +162,9 @@ private:
     bool m_menuDown = false;
 
     Adjust m_adjust[2][kElementCount]; // [landscape, portrait]
+    bool Parse(const std::vector<uint8_t> &bytes); // a layout file into m_adjust (false: none in it)
+    std::string m_forGame;    // the game SetGame was last given
+    std::string m_layoutGame; // whose layout m_adjust holds ("" the general one)
     bool m_editing = false;
     bool m_editFresh = false; // (BeginEdit's frame)
     int m_selected = -1;

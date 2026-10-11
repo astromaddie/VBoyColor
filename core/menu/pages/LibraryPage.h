@@ -18,9 +18,14 @@ class Platform;
 // (X), list or cards (Y).
 // Without a ROMs folder (Android, after "Change ROMs folder") or without
 // ROMs, it says so instead.
+class GameControlsPage;
+
 class LibraryPage : public MenuPage
 {
 public:
+    // Where holding a game's card goes (its own controls).
+    GameControlsPage *gameControlsPage = nullptr;
+
     void Init(UiRenderer &ui, const UiMenuResources &resources) override;
     void OnShow() override;
     void ResetSelection() override {}

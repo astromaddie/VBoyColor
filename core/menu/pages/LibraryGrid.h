@@ -21,6 +21,8 @@ public:
                 float width, float height);
 
     std::function<void(int game)> onPlay;
+    // A card held (a finger or laser held still on it): the game's options.
+    std::function<void(int game)> onOptions;
 
     int SelectedGame() const { return m_selected; }
     void SetSelectedGame(int index, bool instant);

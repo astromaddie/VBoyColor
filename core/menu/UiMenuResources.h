@@ -4,6 +4,7 @@
 #include "gfx/UiIconSet.h"
 
 #include <functional>
+#include <string>
 
 class Emulator;
 class AppMenu;
@@ -11,6 +12,7 @@ struct AppSettings;
 class Platform;
 class ThumbnailLibrary;
 class Updater;
+class GameControls;
 
 enum class ButtonMappingProfile
 {
@@ -52,7 +54,12 @@ struct UiMenuResources
     // Is there a newer VBoy Color (owned by AppMenu - see io/Updater.h).
     Updater *updater = nullptr;
     // The phone app: Settings > Touch controls > Edit (the app closes the
-    // menu and lets the player move the on-screen controls). Set by the app
-    // (AppMenu::SetEditTouchControls) - empty elsewhere.
-    std::function<void()> editTouchControls;
+    // menu and lets the player move the on-screen controls) - game: a game's
+    // own layout (GameControlsPage), "" the general one; and a game's own
+    // layout forgotten. Set by the app (AppMenu::SetEditTouchControls) -
+    // empty elsewhere.
+    std::function<void(const std::string &game)> editTouchControls;
+    std::function<void(const std::string &game)> forgetTouchControls;
+    // The games' own button mappings (owned by AppMenu - see io/GameControls.h).
+    GameControls *gameControls = nullptr;
 };

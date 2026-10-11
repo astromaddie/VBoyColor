@@ -275,7 +275,16 @@ bool LibraryGrid::HandlePointer(const MenuPointer &pointer)
         m_selected = hit;
         RememberSelected();
     }
-    if (hit >= 0 && pointer.clicked && onPlay)
+    if (hit >= 0 && pointer.longPressed && onOptions)
+    {
+        if (hit != m_selected)
+        {
+            m_selected = hit;
+            RememberSelected();
+        }
+        onOptions(hit);
+    }
+    else if (hit >= 0 && pointer.clicked && onPlay)
         onPlay(hit);
     return true;
 }

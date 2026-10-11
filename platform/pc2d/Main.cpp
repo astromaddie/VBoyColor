@@ -90,7 +90,8 @@ namespace
         // (the left stick moves like the D-pad, the triggers press like the bumpers)
         buttonStates[DeviceGamepad] = GamepadCompanionBits(buttonStates[DeviceGamepad]);
         appMenu.ApplyGameplayInputSuppression(buttonStates);
-        uint32_t result = TranslateToVBBitmask(buttonStates, settings.vbButtons);
+        const auto &mapping = appMenu.Controls().Buttons(settings); // (the game's own, if it has one)
+        uint32_t result = TranslateToVBBitmask(buttonStates, mapping);
         // The menu's select/back keys (see PollDesktopButtonState) still read
         // as pressed on the frame the menu closes - drop them until release,
         // same as the bitmask suppression above does for the other devices.
@@ -101,7 +102,7 @@ namespace
                     appMenu.SuppressesDesktopKey(EmuButton_B));
         };
         for (uint32_t vbBit = 0; vbBit < 16; ++vbBit)
-            for (const MappedButton &binding : settings.vbButtons[vbBit].Buttons)
+            for (const MappedButton &binding : mapping[vbBit].Buttons)
                 if (binding.IsSet && binding.InputDevice == DeviceKeyboard &&
                     binding.ButtonIndex >= 0 && binding.ButtonIndex <= GLFW_KEY_LAST &&
                     glfwGetKey(window, binding.ButtonIndex) == GLFW_PRESS && !suppressedKey(binding.ButtonIndex))
@@ -647,7 +648,7 @@ int main(int argc, char **argv)
             {
                 // Shift+F4 (dev): the touch controls' edit mode, as the phone's.
                 g_touchPreview = true;
-                touch.BeginEdit();
+                touch.BeginEdit(platform);
             }
             else if (f4Pressed && !f4WasPressed)
             {
@@ -773,6 +774,7 @@ int main(int argc, char **argv)
                                     my < kMenuHeight;
                 appMenu.SetPointer(inside, mx, my, glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS,
                                    static_cast<float>(-g_scrollY));
+                appMenu.SetPointerSecondary(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
                 g_scrollY = 0.0;
             }
 

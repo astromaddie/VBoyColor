@@ -175,8 +175,10 @@ trigger and moving drags (scrolls lists and the library).
 
 The gamepad column is the PC window's and the phone's. With a gamepad in VR
 (VBoyColorVR.exe, or a pad paired with the Quest), A is on A and B on B.
-Everything can be remapped in Settings → Button mapping. On PC,
-**Alt+Enter** toggles fullscreen.
+Everything can be remapped in Settings → Button mapping - and per game:
+hold a game's card in the library (a finger or a Quest laser held still on
+it; right-click with a mouse) for its own button mapping and, on a phone,
+its own touch controls. On PC, **Alt+Enter** toggles fullscreen.
 
 ## Building
 

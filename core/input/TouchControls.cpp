@@ -46,6 +46,8 @@ namespace
     const XrColor4f kEditBar{0.08f, 0.09f, 0.12f, 0.88f};
 
     constexpr const char *kLayoutFile = "touch-layout.txt";
+    // A game's own layout (TouchControls::SetGame).
+    std::string GameLayoutFile(const std::string &game) { return game + ".touch"; }
     // (every label the small font draws)
     constexpr const char *kSmallGlyphs = "SELECTSTARTSMALLERBIGGERRESETDONEBACK TO GAME";
 
@@ -293,8 +295,14 @@ void TouchControls::MoveElement(int element, float dx, float dy)
     a.dy = std::clamp(a.dy + dy / m_h, -1.0f, 1.0f);
 }
 
-void TouchControls::BeginEdit()
+void TouchControls::BeginEdit(Platform &platform, const std::string &game)
 {
+    // The layout to edit: that game's (its own, or the general one to start
+    // from - saved as its own), or the general one.
+    m_forGame = game;
+    if (game.empty() || !Parse(platform.ReadRomsFile(GameLayoutFile(game), true)))
+        Load(platform);
+    m_layoutGame = game;
     m_editing = true;
     m_visible = true;
     m_selected = -1;
@@ -415,20 +423,32 @@ void TouchControls::DrawResume(UiRenderer &ui) const
     DrawPill(ui, m_resume, "BACK TO GAME", m_resumeDown, m_smallFont);
 }
 
-void TouchControls::Load(Platform &platform)
+bool TouchControls::Parse(const std::vector<uint8_t> &bytes)
 {
-    const std::vector<uint8_t> bytes = platform.ReadRomsFile(kLayoutFile, true);
     std::istringstream in(std::string(bytes.begin(), bytes.end()));
     std::string word;
     int version = 0;
     if (!(in >> word >> version) || word != "vboycolor-touch-layout" || version != 1)
-        return;
+        return false;
+    for (auto &orientation : m_adjust)
+        for (Adjust &a : orientation)
+            a = Adjust{};
     int orientation = 0, element = 0;
     Adjust a;
     while (in >> orientation >> element >> a.dx >> a.dy >> a.scale)
         if (orientation >= 0 && orientation < 2 && element >= 0 && element < kElementCount)
             m_adjust[orientation][element] = {std::clamp(a.dx, -1.0f, 1.0f), std::clamp(a.dy, -1.0f, 1.0f),
                                               std::clamp(a.scale, 0.5f, 2.0f)};
+    return true;
+}
+
+void TouchControls::Load(Platform &platform)
+{
+    if (!Parse(platform.ReadRomsFile(kLayoutFile, true)))
+        for (auto &orientation : m_adjust)
+            for (Adjust &a : orientation)
+                a = Adjust{};
+    m_layoutGame.clear();
 }
 
 void TouchControls::Save(Platform &platform) const
@@ -442,7 +462,39 @@ void TouchControls::Save(Platform &platform) const
             std::snprintf(line, sizeof(line), "%d %d %.5f %.5f %.4f\n", o, e, a.dx, a.dy, a.scale);
             text += line;
         }
-    platform.WriteRomsFile(kLayoutFile, true, text.data(), text.size());
+    platform.WriteRomsFile(m_layoutGame.empty() ? std::string(kLayoutFile) : GameLayoutFile(m_layoutGame), true,
+                           text.data(), text.size());
+}
+
+void TouchControls::SetGame(Platform &platform, const std::string &game)
+{
+    if (game == m_forGame || m_editing)
+        return;
+    m_forGame = game;
+    if (game.empty() || !Parse(platform.ReadRomsFile(GameLayoutFile(game), true)))
+        Load(platform);
+    else
+        m_layoutGame = game;
+}
+
+bool TouchControls::HasGameLayout(Platform &platform, const std::string &game)
+{
+    const std::vector<uint8_t> bytes = platform.ReadRomsFile(GameLayoutFile(game), true);
+    static const std::string kHeader = "vboycolor-touch-layout 1";
+    return bytes.size() >= kHeader.size() && std::equal(kHeader.begin(), kHeader.end(), bytes.begin());
+}
+
+void TouchControls::ForgetGameLayout(Platform &platform, const std::string &game)
+{
+    // (no deleting through every platform's folder access: an empty file is "none")
+    const char none[] = "none\n";
+    platform.WriteRomsFile(GameLayoutFile(game), true, none, sizeof(none) - 1);
+    if (game == m_layoutGame || game == m_forGame)
+    {
+        const std::string current = m_forGame;
+        m_forGame = "\x01"; // (read again)
+        SetGame(platform, current);
+    }
 }
 
 void TouchControls::ScreenArea(float &x, float &y, float &w, float &h) const

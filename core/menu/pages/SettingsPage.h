@@ -17,10 +17,12 @@ class FolderPage;
 // tint) and Library (make the thumbnails again, and Change ROMs folder on
 // platforms where Platform::SupportsChangeRomsFolder() is true). Every
 // change autosaves immediately (see RefreshLabels).
+class EmulatorButtonMapPage;
+
 class SettingsPage : public MenuPage
 {
 public:
-    MenuPage *emulatorButtonMapPage = nullptr;
+    EmulatorButtonMapPage *emulatorButtonMapPage = nullptr;
     MenuPage *moveScreenPage = nullptr;
     FolderPage *folderPage = nullptr;
 

@@ -8,6 +8,8 @@
 #include "menu/pages/SaveStatesPage.h"
 #include "menu/pages/SettingsPage.h"
 #include "menu/pages/EmulatorButtonMapPage.h"
+#include "menu/pages/GameControlsPage.h"
+#include "io/GameControls.h"
 #include "menu/pages/MoveScreenPage.h"
 #include "menu/pages/FolderPage.h"
 #include "menu/pages/AboutPage.h"
@@ -75,6 +77,9 @@ public:
     // follow it - and doesn't click. Without it (the mouse) a press clicks.
     void SetPointer(bool present, float x, float y, bool down, float scroll = 0.0f, bool drawDot = false,
                     bool dragToScroll = false);
+    // The mouse's right button (held) - a click with it is what a long press
+    // is to a finger: a library card's options. Call before Update.
+    void SetPointerSecondary(bool down) { m_pointer.secondaryDown = down; }
 
     // Changes the logical-to-physical scale (see AppMenuLayout.h's
     // kMenuScale doc comment) at runtime - e.g. a resizable window
@@ -94,7 +99,16 @@ public:
     // builds, which have no battery worth reading.
     void SetBatteryPercent(int percent) { m_batteryPercent = percent; }
     // The phone app's touch controls editor (Settings > Touch controls).
-    void SetEditTouchControls(std::function<void()> edit) { m_resources.editTouchControls = std::move(edit); }
+    void SetEditTouchControls(std::function<void(const std::string &game)> edit,
+                              std::function<void(const std::string &game)> forget)
+    {
+        m_resources.editTouchControls = std::move(edit);
+        m_resources.forgetTouchControls = std::move(forget);
+    }
+    // The games' own button mappings: the mapping in force for the game
+    // playing is Controls().Buttons(settings).
+    GameControls &Controls() { return m_gameControls; }
+    const GameControls &Controls() const { return m_gameControls; }
 
     // Menu open/closed - closing lets the emulator screen show unobstructed
     // instead of always sitting under the menu panel. "Resume" and picking a
@@ -162,7 +176,7 @@ private:
     void FocusSidebar();
     void FocusContent();
     void BackFromPage();
-    void HandlePointer();
+    void HandlePointer(float deltaSeconds);
     float SidebarItemY(int item) const;
     float SidebarItemHeight(int item) const;
     std::vector<MenuHint> CurrentHints() const;
@@ -180,7 +194,9 @@ private:
     EmulatorButtonMapPage m_emulatorButtonMapPage;
     MoveScreenPage m_moveScreenPage;
     FolderPage m_folderPage;
+    GameControlsPage m_gameControlsPage;
     AboutPage m_aboutPage;
+    GameControls m_gameControls;
 
     ThumbnailLibrary m_thumbnails;
     // A newer VBoy Color: checked once a few seconds after the start (if
@@ -212,6 +228,9 @@ private:
         // drag), where, and whether it moved far enough to be a drag.
         bool dragToScroll = false, pressed = false, dragging = false;
         float pressX = 0, pressY = 0, velocityY = 0;
+        bool secondaryDown = false, secondaryWasDown = false; // the mouse's right button
+        float heldSeconds = 0;  // how long it's been held still
+        bool longFired = false; // a long press was reported for this press
     } m_pointer;
     int m_sidebarHover = -1;
     // The hints row's hints, where they were last drawn (clickable).

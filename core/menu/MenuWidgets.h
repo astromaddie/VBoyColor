@@ -19,6 +19,7 @@ struct MenuPointer
     float x = 0, y = 0;
     bool moved = false;   // it moved since last frame: hovering selects
     bool clicked = false; // a click this frame (the mouse: pressed; a laser: a short press, on release)
+    bool longPressed = false; // a finger or laser held still on one spot a while (a card's options) - once
     float scroll = 0;     // wheel/stick scroll this frame, in rows (+ = down)
     // A laser held down and moved: the content under where it was pressed
     // (pressX, pressY) follows it - dragY is how far it moved this frame

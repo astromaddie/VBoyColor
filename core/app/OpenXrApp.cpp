@@ -940,7 +940,7 @@ void OpenXrApp::RenderFrame()
     m_appMenu.ApplyGameplayInputSuppression(gameplayButtonStates);
     const uint32_t joypadBits = m_appMenu.IsOpen()
                                     ? 0
-                                    : ButtonMapper::TranslateToVBBitmask(gameplayButtonStates, m_settings.vbButtons);
+                                    : ButtonMapper::TranslateToVBBitmask(gameplayButtonStates, m_appMenu.Controls().Buttons(m_settings));
     m_emulator.SetGameplayInput(joypadBits);
     // Before RunFrame, and even while paused: a palette change from the
     // menu re-colors the frame already on screen (see SetShadePalette).

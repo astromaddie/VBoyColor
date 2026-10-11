@@ -192,6 +192,7 @@ void AppMenu::Initialize(UiRenderer &ui, VkFormat targetFormat, Emulator &emulat
     m_resources.passthroughSupported = passthroughSupported;
     m_thumbnails.Init(ui, platform, emulator, settings);
     m_resources.thumbnails = &m_thumbnails;
+    m_resources.gameControls = &m_gameControls;
     m_updater.Init(platform, kVersionString);
     m_resources.updater = &m_updater;
     // Physical pixel size - kMenuWidth/kMenuHeight are logical units (see
@@ -315,7 +316,7 @@ void AppMenu::RebuildLogo(UiRenderer &ui)
 void AppMenu::InitPages(UiRenderer &ui)
 {
     MenuPage *pages[] = {&m_libraryPage, &m_saveStatesPage, &m_settingsPage, &m_emulatorButtonMapPage, &m_moveScreenPage,
-                         &m_folderPage, &m_aboutPage};
+                         &m_folderPage, &m_gameControlsPage, &m_aboutPage};
     for (MenuPage *page : pages)
     {
         page->Navigate = [this](MenuPage *target, int dir) { StartTransition(target, dir); };
@@ -328,6 +329,7 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_emulatorButtonMapPage.sidebarItem = SidebarSettings;
     m_moveScreenPage.sidebarItem = SidebarSettings;
     m_folderPage.sidebarItem = SidebarSettings;
+    m_gameControlsPage.sidebarItem = SidebarLibrary;
     m_aboutPage.sidebarItem = SidebarAbout;
 
     // Cross-page links
@@ -336,6 +338,9 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_emulatorButtonMapPage.settingsPage = &m_settingsPage;
     m_moveScreenPage.settingsPage = &m_settingsPage;
     m_settingsPage.folderPage = &m_folderPage;
+    m_libraryPage.gameControlsPage = &m_gameControlsPage;
+    m_gameControlsPage.libraryPage = &m_libraryPage;
+    m_gameControlsPage.buttonMapPage = &m_emulatorButtonMapPage;
     m_folderPage.settingsPage = &m_settingsPage;
     // A kind's folder changed: the games folder's games, and the settings
     // written where they now live.
@@ -506,7 +511,7 @@ float AppMenu::SidebarItemY(int item) const
     return y;
 }
 
-void AppMenu::HandlePointer()
+void AppMenu::HandlePointer(float deltaSeconds)
 {
     Pointer &p = m_pointer;
     // (just arrived - e.g. the app starting under a resting mouse - isn't a move)
@@ -517,6 +522,8 @@ void AppMenu::HandlePointer()
     }
     bool moved = p.present && (std::abs(p.x - p.lastX) > 0.01f || std::abs(p.y - p.lastY) > 0.01f);
     bool clicked = p.present && p.down && !p.wasDown;
+    bool longPressed = p.present && p.secondaryDown && !p.secondaryWasDown; // (the mouse's right button)
+    p.secondaryWasDown = p.secondaryDown;
     float dragY = 0.0f, flingY = 0.0f;
     if (p.dragToScroll)
     {
@@ -525,6 +532,9 @@ void AppMenu::HandlePointer()
         // laser a little) it's a click, where it was let go; moved further
         // while held, a drag - never a click.
         constexpr float kDragStart = 8.0f; // menu units
+        // Held still that long: a long press (a library card's options) - and
+        // letting go then isn't a click.
+        constexpr float kLongPress = 0.55f;
         clicked = false;
         if (p.present && p.down && !p.wasDown)
         {
@@ -533,12 +543,20 @@ void AppMenu::HandlePointer()
             p.pressX = p.x;
             p.pressY = p.y;
             p.velocityY = 0.0f;
+            p.heldSeconds = 0.0f;
+            p.longFired = false;
         }
         if (p.pressed && !p.present)
             p.pressed = p.dragging = false; // (the laser left the menu: cancelled)
+        if (p.pressed && p.down && !p.dragging && !p.longFired)
+        {
+            p.heldSeconds += deltaSeconds;
+            if (p.heldSeconds >= kLongPress && std::hypot(p.x - p.pressX, p.y - p.pressY) <= kDragStart)
+                longPressed = p.longFired = true;
+        }
         if (p.pressed && p.down)
         {
-            if (!p.dragging && std::hypot(p.x - p.pressX, p.y - p.pressY) > kDragStart)
+            if (!p.dragging && !p.longFired && std::hypot(p.x - p.pressX, p.y - p.pressY) > kDragStart)
             {
                 p.dragging = true;
                 dragY = p.y - p.pressY; // (from where it was pressed: no lost motion)
@@ -551,7 +569,7 @@ void AppMenu::HandlePointer()
         {
             if (p.dragging)
                 flingY = p.velocityY * 8.0f; // (a flick keeps it going a little)
-            else
+            else if (!p.longFired)
                 clicked = true;
             p.pressed = p.dragging = false;
         }
@@ -625,6 +643,7 @@ void AppMenu::HandlePointer()
     pointer.y = p.y;
     pointer.moved = moved;
     pointer.clicked = clicked;
+    pointer.longPressed = longPressed;
     pointer.scroll = scroll;
     pointer.dragging = p.dragging;
     pointer.pressX = px;
@@ -636,6 +655,10 @@ void AppMenu::HandlePointer()
 
 void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], float deltaSeconds)
 {
+    // The game playing's own button mapping, if it has one (read when the game changes).
+    if (m_resources.platform && m_resources.emulator)
+        m_gameControls.SetGame(*m_resources.platform, m_resources.emulator->RomName());
+
     // Per-bit, not all-or-nothing: releasing one of two suppressed buttons
     // must free it up again even while the other is still held.
     for (int device = 0; device < 3; ++device)
@@ -706,7 +729,7 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
         }
     }
 
-    HandlePointer();
+    HandlePointer(deltaSeconds);
 
     const bool wasOpen = m_open;
     if (m_sidebarFocus)

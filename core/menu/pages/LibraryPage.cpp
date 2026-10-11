@@ -1,4 +1,5 @@
 #include "menu/pages/LibraryPage.h"
+#include "menu/pages/GameControlsPage.h"
 #include "emu/Emulator.h"
 #include "io/Platform.h"
 #include "io/Settings.h"
@@ -56,6 +57,16 @@ void LibraryPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                                                kContentHeight);
         m_grid->SetListView(m_settings && m_settings->libraryListView);
         m_grid->onPlay = [this](int game) { Play(game); };
+        m_grid->onOptions = [this](int game)
+        {
+            if (!gameControlsPage || !m_library)
+                return;
+            const auto games = m_library->Games();
+            if (game < 0 || game >= static_cast<int>(games.size()))
+                return;
+            gameControlsPage->Open(games[game].rom.name, games[game].title);
+            Navigate(gameControlsPage, 1);
+        };
         m_menu.MenuItems.push_back(m_grid);
         m_menu.YPress = [this]() { ToggleView(); };
         m_menu.XPress = [this]() { ToggleSort(); };
