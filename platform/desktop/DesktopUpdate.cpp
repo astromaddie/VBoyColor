@@ -1,5 +1,6 @@
 // DesktopPlatform's updates: a release package (the CI's
-// VBoyColor-windows-<version>.zip or VBoyColor-linux-<version>.tar.gz, one
+// VBoyColor-<version>-windows-x64.zip or VBoyColor-<version>-linux-x64.tar.gz
+// (older ones: VBoyColor-windows-<version>.zip and the like), one
 // folder with the app inside) unpacked over the app's own folder.
 //
 // - The games folder that ships in the package (roms/, just a note) is left

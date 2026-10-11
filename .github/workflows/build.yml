@@ -63,7 +63,7 @@ jobs:
         run: |
           set -e
           version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build-pc/generated/Version.h)
-          dir=VBoyColor-windows-$version
+          dir=VBoyColor-$version-windows-x64
           mkdir -p "$dir/roms"
           cp build-pc/Release/VBoyColor.exe build-pc/Release/VBoyColorVR.exe "$dir/"
           cp build-pc/Release/*.dll "$dir/" 2>/dev/null || true
@@ -113,7 +113,7 @@ jobs:
         run: |
           set -e
           version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build-pc/generated/Version.h)
-          dir=VBoyColor-linux-$version
+          dir=VBoyColor-$version-linux-x64
           mkdir -p "$dir/roms"
           cp build-pc/VBoyColor "$dir/"
           strip "$dir/VBoyColor"
@@ -183,12 +183,15 @@ jobs:
           if [ -n "$PRERELEASE" ]; then version="v$base-${PRERELEASE#*-}"
           elif [ "$OFFICIAL" = "ON" ]; then version="v$base"
           else version="v$base-dev.$(git rev-list --count HEAD)"; fi
-          cp android/app/build/outputs/apk/release/app-release.apk "VBoyColor-$version.apk"
+          # One APK for both: Meta Quest (the VR app) and Android phones,
+          # tablets and handhelds (the flat app) - 64-bit ARM.
+          apk="VBoyColor-$version-quest-android-arm64"
+          cp android/app/build/outputs/apk/release/app-release.apk "$apk.apk"
           # Which key signed it - the same SHA-256 on every build = each one
           # installs over the last.
           apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner
-          { echo "### APK signature"; echo '```'; "$apksigner" verify --print-certs "VBoyColor-$version.apk" | grep -E "certificate (DN|SHA-256)"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
-          echo "PACKAGE=VBoyColor-$version" >> "$GITHUB_ENV"
+          { echo "### APK signature"; echo '```'; "$apksigner" verify --print-certs "$apk.apk" | grep -E "certificate (DN|SHA-256)"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+          echo "PACKAGE=$apk" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -217,9 +220,35 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Which download is for which device - above GitHub's list of changes.
+      - name: Release notes
+        run: |
+          set -e
+          cd dist
+          apk=$(ls *-quest-android-arm64.apk)
+          win=$(ls *-windows-x64.zip)
+          lin=$(ls *-linux-x64.tar.gz)
+          {
+            echo "## Which download?"
+            echo
+            echo "| Your device | Download |"
+            echo "|---|---|"
+            echo "| **Meta Quest** 2, 3, 3S, Pro - in VR, in 3D | \`$apk\` |"
+            echo "| **Android phones, tablets and handhelds** (Android 10 or newer, 64-bit ARM, Vulkan - nearly every device from the last several years; Retroid, AYN, Anbernic and other Android handhelds too) - touch controls or a gamepad | \`$apk\` (the same file) |"
+            echo "| **Windows** 10 / 11, 64-bit, with a Vulkan graphics driver - \`VBoyColor.exe\` plays in a window; \`VBoyColorVR.exe\` in a PC VR headset (Quest Link / Air Link, Virtual Desktop, SteamVR) | \`$win\` |"
+            echo "| **Linux** x86-64 with Vulkan - in a window | \`$lin\` |"
+            echo
+            echo "Not yet: macOS, iPhone / iPad, Nintendo Switch, 32-bit Android. Other Android VR headsets are untested."
+            echo
+            echo "VBoy Color updates itself from here (About -> Update). No games are included - use only ROMs you made from cartridges you own."
+            echo
+          } > ../release-notes.md
+          cat ../release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: release-notes.md
           generate_release_notes: true
           # v1.0.0-beta.1 and the like: a pre-release
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -112,10 +112,10 @@ pack).*
 
 ### Quest (Quest 2, 3, 3S, Pro)
 
-1. Download `VBoyColor-<version>.apk` from
+1. Download `VBoyColor-<version>-quest-android-arm64.apk` from
    [Releases](https://github.com/yuk27/VBoyColor/releases).
 2. Install it with [SideQuest](https://sidequestvr.com) or
-   `adb install VBoyColor-<version>.apk` (the headset must be in developer
+   `adb install VBoyColor-<version>-quest-android-arm64.apk` (the headset must be in developer
    mode).
 3. Copy your `.vb` ROMs to a folder on the headset (for example
    `Download/VBoyColor`). The color packs are built in.
@@ -124,8 +124,9 @@ pack).*
 
 ### Android phones and tablets
 
-The same `VBoyColor-<version>.apk` works on phones and tablets (Android 10 or
-newer, with Vulkan - nearly every phone from the last several years).
+The same `VBoyColor-<version>-quest-android-arm64.apk` works on phones, tablets
+and Android handhelds (Android 10 or newer, 64-bit ARM, with Vulkan - nearly
+every device from the last several years).
 Install it, open VBoy Color and pick the folder with your `.vb` ROMs when it
 asks. The Virtual Boy controller is on the screen: the left D-pad with
 Select and Start, B and A with the right D-pad above them (only in the games
@@ -135,7 +136,7 @@ step aside until you touch the screen again. Back opens the menu.
 
 ### Windows
 
-Download `VBoyColor-windows-<version>.zip` from
+Download `VBoyColor-<version>-windows-x64.zip` from
 [Releases](https://github.com/yuk27/VBoyColor/releases), unzip it, put your
 ROMs in the `roms` folder and run `VBoyColor.exe`. You can also drop a `.vb`
 file on the window, or open one with `VBoyColor.exe`. `VBoyColorVR.exe` is the
@@ -143,7 +144,7 @@ VR version for a PC headset (Quest Link, Virtual Desktop or SteamVR).
 
 ### Linux
 
-Download `VBoyColor-linux-<version>.tar.gz`, unpack it, put your ROMs in
+Download `VBoyColor-<version>-linux-x64.tar.gz`, unpack it, put your ROMs in
 `roms` and run `./VBoyColor` from that folder. Needs a Vulkan driver.
 
 ## Controls
