@@ -9,7 +9,30 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstdarg>
 #include <stdexcept>
+#include <string>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
+namespace
+{
+    // A log line: logcat on Android (tag VBoyColor), stderr elsewhere.
+    void XrLogLine(const char *fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+#ifdef __ANDROID__
+        __android_log_vprint(ANDROID_LOG_INFO, "VBoyColor", fmt, args);
+#else
+        std::vfprintf(stderr, fmt, args);
+        std::fputc('\n', stderr);
+#endif
+        va_end(args);
+    }
+} // namespace
 
 namespace
 {
@@ -263,7 +286,7 @@ void OpenXrApp::CreateInstance(const InitInfo &info)
     XrInstanceProperties instanceProperties{XR_TYPE_INSTANCE_PROPERTIES};
     CheckXr(xrGetInstanceProperties(m_instance, &instanceProperties), "xrGetInstanceProperties");
     m_runtimeName = instanceProperties.runtimeName;
-    std::fprintf(stderr, "[OpenXR] Runtime: %s\n", m_runtimeName.c_str());
+    XrLogLine("[OpenXR] Runtime: %s", m_runtimeName.c_str());
 }
 
 void OpenXrApp::InitializeSystem()
@@ -521,9 +544,12 @@ void OpenXrApp::RequestMaxDisplayRefreshRate()
     }
     const float best = bestMultiple > 0.0f ? bestMultiple : bestAny;
 
-    if (best > 0.0f && XR_SUCCEEDED(pfnRequestRate(m_session, best)))
-        std::fprintf(stderr, "[OpenXR] Requested display refresh rate: %.0f Hz%s\n", best,
-                     bestMultiple > 0.0f ? " (a multiple of the VB's 50.27Hz)" : "");
+    std::string offered;
+    for (const float rate : rates)
+        offered += (offered.empty() ? "" : ", ") + std::to_string(static_cast<int>(std::lround(rate)));
+    const XrResult requested = best > 0.0f ? pfnRequestRate(m_session, best) : XR_ERROR_VALIDATION_FAILURE;
+    XrLogLine("[OpenXR] Display refresh rates offered: %s Hz - asked for %.0f Hz%s%s", offered.c_str(), best,
+              bestMultiple > 0.0f ? " (a multiple of the VB's 50.27Hz)" : "", XR_SUCCEEDED(requested) ? "" : " (refused)");
 }
 
 void OpenXrApp::HandleSessionStateChanged(const XrEventDataSessionStateChanged &event, bool &exitRenderLoop,

@@ -340,7 +340,9 @@ bool Emulator::LoadRom(const std::string &romPath, const std::string &displayNam
         if (!m_movieSession) // (a movie starts from a fresh battery save, as it was made)
             LoadRam();
         m_ramCheckSeconds = 0.0f;
-        std::fprintf(stderr, "[Emulator] %s\n", ReloadColorPack().c_str());
+        // (logcat on Android: which pack a game got, and why - see ReloadColorPack)
+        LogLine("[Emulator] %s (CRC %08X, %u bytes): %s", m_romBaseName.c_str(), m_romCrc, m_romSize,
+                ReloadColorPack().c_str());
     }
 
     return m_romLoaded;
