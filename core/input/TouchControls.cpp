@@ -199,26 +199,33 @@ void TouchControls::ApplyAdjust()
 {
     const bool portrait = m_h > m_w;
     const float margin = 6.0f * m_dp;
-    auto center = [&](float &x, float &y, const Adjust &a)
+    // A control's center, moved as the player moved it - but all of the
+    // control stays on the screen (halfW, halfH: its half size), and the
+    // move is kept as it ended up, so dragging past an edge and back
+    // doesn't leave it stuck there.
+    auto center = [&](float &x, float &y, float halfW, float halfH, Adjust &a)
     {
-        x = std::clamp(x + a.dx * m_w, margin, m_w - margin);
-        y = std::clamp(y + a.dy * m_h, margin, m_h - margin);
+        const float x0 = x, y0 = y;
+        x = std::clamp(x + a.dx * m_w, std::min(halfW + margin, m_w / 2.0f), std::max(m_w - halfW - margin, m_w / 2.0f));
+        y = std::clamp(y + a.dy * m_h, std::min(halfH + margin, m_h / 2.0f), std::max(m_h - halfH - margin, m_h / 2.0f));
+        a.dx = (x - x0) / m_w;
+        a.dy = (y - y0) / m_h;
     };
-    auto circle = [&](Circle &c, const Adjust &a)
+    auto circle = [&](Circle &c, Adjust &a)
     {
-        center(c.x, c.y, a);
         c.r *= a.scale;
+        center(c.x, c.y, c.r, c.r, a);
     };
-    auto rect = [&](Rect &r, const Adjust &a)
+    auto rect = [&](Rect &r, Adjust &a)
     {
         float cx = r.x + r.w / 2.0f, cy = r.y + r.h / 2.0f;
-        center(cx, cy, a);
         r.w *= a.scale;
         r.h *= a.scale;
+        center(cx, cy, r.w / 2.0f, r.h / 2.0f, a);
         r.x = cx - r.w / 2.0f;
         r.y = cy - r.h / 2.0f;
     };
-    const Adjust *a = m_adjust[portrait ? 1 : 0];
+    Adjust *a = m_adjust[portrait ? 1 : 0];
     circle(m_leftPad, a[kLeftPad]);
     circle(m_rightPad, a[kRightPad]);
     circle(m_a, a[kA]);
