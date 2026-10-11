@@ -26,7 +26,10 @@ void GameControls::Reload(Platform &platform)
 
 const GameControls::Mapping &GameControls::Buttons(const AppSettings &settings) const
 {
-    return m_has ? m_buttons : settings.vbButtons;
+    // (not ?: - MSVC turns the arrays into pointers there)
+    if (m_has)
+        return m_buttons;
+    return settings.vbButtons;
 }
 
 bool GameControls::Load(Platform &platform, const std::string &game, ButtonMapper::MappedButtons out[16])

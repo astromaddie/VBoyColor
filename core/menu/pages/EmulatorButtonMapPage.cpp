@@ -257,7 +257,10 @@ void EmulatorButtonMapPage::ApplyDefaultMapping(bool overwrite)
 
 EmulatorButtonMapPage::Mapping &EmulatorButtonMapPage::Target()
 {
-    return m_game.empty() ? m_settings->vbButtons : m_gameButtons;
+    // (not ?: - MSVC turns the arrays into pointers there)
+    if (m_game.empty())
+        return m_settings->vbButtons;
+    return m_gameButtons;
 }
 
 void EmulatorButtonMapPage::OpenFor(const std::string &game, const std::string &title, MenuPage *back)
