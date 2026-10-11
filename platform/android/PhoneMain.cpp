@@ -565,7 +565,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             touches.push_back({id, f.x, f.y});
 
         // A finger in the menu: tap to pick, drag to scroll (the first one).
-        if (appMenu.IsVisible())
+        // (Not while it fades out for the touch editor: those fingers are the editor's.)
+        if (appMenu.IsVisible() && !editing)
         {
             const Finger *first = state.fingers.empty() ? nullptr : &state.fingers.begin()->second;
             const float mx = first ? (first->x - menuX) / menuScale : 0.0f, my = first ? (first->y - menuY) / menuScale : 0.0f;
@@ -576,6 +577,10 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
 
         if (editing)
         {
+            // (the menu still fades out - only its Update moves that along;
+            // without it the menu stayed on screen, frozen, over the editor)
+            uint32_t noButtons[3] = {}, noLastButtons[3] = {};
+            appMenu.Update(noButtons, noLastButtons, deltaSeconds);
             const bool backTapped = state.backHeld && !backWasHeld;
             backWasHeld = state.backHeld;
             if (touch.UpdateEdit(touches) || backTapped)
@@ -719,14 +724,18 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
                                         settings.screenLook);
             }
         }
-        if (appMenu.IsVisible())
+        if (editing)
+        {
+            touch.DrawEdit(uiRenderer);
+            if (appMenu.IsVisible()) // (fading out)
+                appMenu.Draw(uiRenderer, menuX, menuY);
+        }
+        else if (appMenu.IsVisible())
         {
             appMenu.Draw(uiRenderer, menuX, menuY);
             if (emulator.HasGame())
                 touch.DrawResume(uiRenderer);
         }
-        else if (editing)
-            touch.DrawEdit(uiRenderer);
         else
             touch.Draw(uiRenderer);
         uiRenderer.EndFrame();
