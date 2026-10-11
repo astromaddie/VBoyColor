@@ -587,7 +587,8 @@ int main(int argc, char **argv)
              f7WasPressed = false, f6WasPressed = false, f12WasPressed = false, fullscreenWasPressed = false;
         bool keyboardWasDown[GLFW_KEY_LAST + 1]{};
 
-        while (!glfwWindowShouldClose(window))
+        // (an update in place: out, as on closing, then start again - see the end)
+        while (!glfwWindowShouldClose(window) && !platform.RestartRequested())
         {
             glfwPollEvents();
 
@@ -937,5 +938,7 @@ int main(int argc, char **argv)
 
     glfwDestroyWindow(window);
     glfwTerminate();
+    if (platform.RestartRequested())
+        platform.Relaunch(); // (an update - see Updater)
     return exitCode;
 }

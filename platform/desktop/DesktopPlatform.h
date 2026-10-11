@@ -46,8 +46,21 @@ public:
     int GetBatteryPercent() const override { return -1; } // no real battery to read off Android
 
     // On a thread of its own: WinHTTP on Windows, curl elsewhere.
-    bool StartDownload(const std::string &url) override;
-    int PollDownload(std::vector<uint8_t> &bytes) override;
+    bool StartDownload(const std::string &url, int slot = kDownloadBoxArt) override;
+    int PollDownload(std::vector<uint8_t> &bytes, int slot = kDownloadBoxArt) override;
+
+    // Updates (DesktopUpdate.cpp): the release's .zip (Windows) or .tar.gz
+    // (Linux) unpacked over the app's folder - the games folder (roms/) left
+    // alone, the running exe moved aside as "<name>.old" (removed at the
+    // next start) - then a restart.
+    const char *UpdatePackage() const override;
+    std::string InstallUpdate(const std::vector<uint8_t> &package, bool &installed) override;
+    bool RestartRequested() const override { return m_restart; }
+    void RequestRestart() override { m_restart = true; }
+    // Starts the app again (after RestartRequested, once everything is
+    // saved and shut down).
+    void Relaunch() const;
+    void OpenUrl(const std::string &url) override;
 
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 
@@ -60,7 +73,9 @@ private:
 
     const char *m_settingsFileName;
     std::string m_appFolder;                 // the exe's (UTF-8)
+    std::string m_exePath;                   // the running exe (UTF-8)
+    bool m_restart = false;
     std::string m_folders[kDataKindCount];   // chosen ones, "" = default
     struct Download;
-    std::shared_ptr<Download> m_download; // (shared with its thread)
+    std::shared_ptr<Download> m_download[2]; // per slot (shared with its thread)
 };

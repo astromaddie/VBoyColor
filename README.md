@@ -86,6 +86,13 @@ pack).*
 - **Your room as the background** (Quest) - Settings → Adjust screen →
   Show your room around it: the game floats in your room (passthrough)
   instead of in the dark.
+- **Updates** - VBoy Color looks for a new version when it starts (About →
+  Check when VBoy Color starts) and shows *Update available* in the
+  sidebar; About → Update installs it. On PC the app replaces its own files
+  (your games and saves stay) and restarts; on Android the system's
+  installer takes the new APK (allow VBoy Color to install apps once; on the
+  Quest it installs when the app next starts). A beta looks for betas too,
+  a full release only for full releases.
 - **Your own folders** - Settings → Folders: choose where your games,
   saved games, save states and settings go (a synced folder, say). On PC
   you pick them right in the menu, with the mouse, a gamepad or in VR; on

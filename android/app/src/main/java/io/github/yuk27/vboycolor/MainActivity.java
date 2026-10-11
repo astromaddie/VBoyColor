@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.UriPermission;
+import android.content.pm.PackageInstaller;
+import android.app.PendingIntent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.BatteryManager;
@@ -18,6 +20,8 @@ import android.view.HapticFeedbackConstants;
 import android.view.View;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
@@ -54,6 +58,11 @@ public class MainActivity extends NativeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (prefs.getBoolean(PREF_INSTALL_PENDING, false)) {
+            // An update downloaded in VR: install it now, before the headset view.
+            prefs.edit().remove(PREF_INSTALL_PENDING).apply();
+            startInstall();
+        }
         int pending = prefs.getInt(PREF_PICK_PENDING, -1);
         if (getRomsTreeUriString() == null) {
             requestPickRomsFolder();
@@ -612,43 +621,45 @@ public class MainActivity extends NativeActivity {
         return copied;
     }
 
-    // ---- Downloads (the library's optional box art): one at a time, on a
-    // thread of its own; native code polls (AndroidPlatform::PollDownload). ----
+    // ---- Downloads: one at a time per slot (0 the library's box art, 1 the
+    // updater's), each on a thread of its own; native code polls
+    // (AndroidPlatform::PollDownload). ----
 
-    private static final int MAX_DOWNLOAD_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
     private final Object downloadLock = new Object();
-    private int downloadState = -1; // 0 running, 1 done, -1 failed/none
-    private byte[] downloadBytes;
+    private final int[] downloadState = {-1, -1}; // 0 running, 1 done, -1 failed/none
+    private final byte[][] downloadBytes = new byte[2][];
 
-    public boolean startDownload(final String url) {
+    public boolean startDownload(final String url, final int slot) {
         synchronized (downloadLock) {
-            if (downloadState == 0) {
+            if (slot < 0 || slot > 1 || downloadState[slot] == 0) {
                 return false;
             }
-            downloadState = 0;
-            downloadBytes = null;
+            downloadState[slot] = 0;
+            downloadBytes[slot] = null;
         }
         new Thread(new Runnable() {
             @Override
             public void run() {
-                runDownload(url);
+                runDownload(url, slot);
             }
         }).start();
         return true;
     }
 
-    private void runDownload(String url) {
+    private void runDownload(String url, int slot) {
         byte[] result = null;
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(url).openConnection();
             connection.setConnectTimeout(10000);
-            connection.setReadTimeout(20000);
+            connection.setReadTimeout(30000);
             connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("User-Agent", "VBoyColor");
             if (connection.getResponseCode() == 200) {
                 try (InputStream in = connection.getInputStream()) {
                     ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    byte[] buffer = new byte[16384];
+                    byte[] buffer = new byte[65536];
                     int read;
                     while ((read = in.read(buffer)) > 0 && out.size() <= MAX_DOWNLOAD_BYTES) {
                         out.write(buffer, 0, read);
@@ -666,24 +677,135 @@ public class MainActivity extends NativeActivity {
             }
         }
         synchronized (downloadLock) {
-            downloadBytes = result;
-            downloadState = result != null ? 1 : -1;
+            downloadBytes[slot] = result;
+            downloadState[slot] = result != null ? 1 : -1;
         }
     }
 
     // 0 running, 1 done (then takeDownload), -1 failed or none.
-    public int pollDownload() {
+    public int pollDownload(int slot) {
         synchronized (downloadLock) {
-            return downloadState;
+            return slot >= 0 && slot <= 1 ? downloadState[slot] : -1;
         }
     }
 
-    public byte[] takeDownload() {
+    public byte[] takeDownload(int slot) {
         synchronized (downloadLock) {
-            byte[] bytes = downloadBytes;
-            downloadBytes = null;
-            downloadState = -1;
+            byte[] bytes = downloadBytes[slot];
+            downloadBytes[slot] = null;
+            downloadState[slot] = -1;
             return bytes;
         }
+    }
+
+    // ---- Updates (core/io/Updater.h): a new APK to the system's installer.
+    // On a headset that waits for the app's next start (the installer would
+    // take VR focus - see requestPickRomsFolder). The phone must allow VBoy
+    // Color to install apps once ("Install unknown apps"). ----
+
+    private static final String UPDATE_FILE = "update.apk";
+    private static final String ACTION_INSTALL_STATUS = "io.github.yuk27.vboycolor.INSTALL_STATUS";
+    private volatile String installStatus = null;
+
+    // Returns a line for the menu.
+    public String installUpdate(byte[] apk) {
+        File file = new File(getCacheDir(), UPDATE_FILE);
+        try (OutputStream out = new FileOutputStream(file)) {
+            out.write(apk);
+        } catch (Exception e) {
+            Log.e(TAG, "installUpdate: couldn't save the APK", e);
+            return "Couldn't save the update";
+        }
+        if (isHeadset()) {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_INSTALL_PENDING, true).apply();
+            return "Restart VBoy Color to install it";
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                startInstall();
+            }
+        });
+        return "Installing...";
+    }
+
+    private static final String PREF_INSTALL_PENDING = "install_pending";
+
+    private void startInstall() {
+        File file = new File(getCacheDir(), UPDATE_FILE);
+        if (!file.exists()) {
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                // (once: the system asks to let VBoy Color install apps)
+                installStatus = "Allow VBoy Color to install apps, then update again";
+                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName())));
+                return;
+            }
+            PackageInstaller installer = getPackageManager().getPackageInstaller();
+            PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+            int sessionId = installer.createSession(params);
+            try (PackageInstaller.Session session = installer.openSession(sessionId)) {
+                try (OutputStream out = session.openWrite("vboycolor", 0, file.length());
+                     InputStream in = new java.io.FileInputStream(file)) {
+                    byte[] buffer = new byte[65536];
+                    int read;
+                    while ((read = in.read(buffer)) > 0) {
+                        out.write(buffer, 0, read);
+                    }
+                    session.fsync(out);
+                }
+                Intent intent = new Intent(this, MainActivity.class).setAction(ACTION_INSTALL_STATUS);
+                int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+                PendingIntent pending = PendingIntent.getActivity(this, 0, intent, flags);
+                session.commit(pending.getIntentSender());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startInstall failed", e);
+            installStatus = "This device didn't take the update - get it from the release page";
+        }
+    }
+
+    // The installer's answer (a confirmation to show, or how it went).
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent == null || !ACTION_INSTALL_STATUS.equals(intent.getAction())) {
+            return;
+        }
+        int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+            if (confirm != null) {
+                startActivity(confirm);
+            }
+        } else if (status == PackageInstaller.STATUS_SUCCESS) {
+            installStatus = "Updated";
+        } else {
+            String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+            installStatus = "Not installed" + (message != null ? " (" + message + ")" : "");
+        }
+    }
+
+    // How the last install went, once ("" if nothing new).
+    public String takeInstallStatus() {
+        String status = installStatus;
+        installStatus = null;
+        return status == null ? "" : status;
+    }
+
+    public void openUrl(final String url) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Exception e) {
+                    Log.w(TAG, "openUrl failed: " + url, e);
+                }
+            }
+        });
     }
 }

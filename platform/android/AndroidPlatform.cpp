@@ -239,32 +239,32 @@ int AndroidPlatform::GetBatteryPercent() const
     return percent;
 }
 
-bool AndroidPlatform::StartDownload(const std::string &url)
+bool AndroidPlatform::StartDownload(const std::string &url, int slot)
 {
     JNIEnv *env = nullptr;
     m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
 
     jclass activityClass = env->GetObjectClass(m_activity);
-    jmethodID start = env->GetMethodID(activityClass, "startDownload", "(Ljava/lang/String;)Z");
+    jmethodID start = env->GetMethodID(activityClass, "startDownload", "(Ljava/lang/String;I)Z");
     jstring urlJString = env->NewStringUTF(url.c_str());
-    const bool started = env->CallBooleanMethod(m_activity, start, urlJString);
+    const bool started = env->CallBooleanMethod(m_activity, start, urlJString, static_cast<jint>(slot));
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(urlJString);
     return started;
 }
 
-int AndroidPlatform::PollDownload(std::vector<uint8_t> &bytes)
+int AndroidPlatform::PollDownload(std::vector<uint8_t> &bytes, int slot)
 {
     JNIEnv *env = nullptr;
     m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
 
     jclass activityClass = env->GetObjectClass(m_activity);
-    jmethodID poll = env->GetMethodID(activityClass, "pollDownload", "()I");
-    int state = env->CallIntMethod(m_activity, poll);
+    jmethodID poll = env->GetMethodID(activityClass, "pollDownload", "(I)I");
+    int state = env->CallIntMethod(m_activity, poll, static_cast<jint>(slot));
     if (state == 1)
     {
-        jmethodID take = env->GetMethodID(activityClass, "takeDownload", "()[B");
-        auto array = static_cast<jbyteArray>(env->CallObjectMethod(m_activity, take));
+        jmethodID take = env->GetMethodID(activityClass, "takeDownload", "(I)[B");
+        auto array = static_cast<jbyteArray>(env->CallObjectMethod(m_activity, take, static_cast<jint>(slot)));
         if (array)
         {
             const jsize length = env->GetArrayLength(array);
@@ -277,6 +277,64 @@ int AndroidPlatform::PollDownload(std::vector<uint8_t> &bytes)
     }
     env->DeleteLocalRef(activityClass);
     return state;
+}
+
+std::string AndroidPlatform::InstallUpdate(const std::vector<uint8_t> &package, bool &installed)
+{
+    installed = false;
+    // (an APK is a zip - the cheapest sanity check)
+    if (package.size() < 4 || package[0] != 'P' || package[1] != 'K')
+        return "The download isn't an APK - nothing changed";
+    JNIEnv *env = nullptr;
+    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID install = env->GetMethodID(activityClass, "installUpdate", "([B)Ljava/lang/String;");
+    env->DeleteLocalRef(activityClass);
+    jbyteArray array = env->NewByteArray(static_cast<jsize>(package.size()));
+    env->SetByteArrayRegion(array, 0, static_cast<jsize>(package.size()), reinterpret_cast<const jbyte *>(package.data()));
+    auto result = static_cast<jstring>(env->CallObjectMethod(m_activity, install, array));
+    env->DeleteLocalRef(array);
+    std::string text;
+    if (result)
+    {
+        const char *chars = env->GetStringUTFChars(result, nullptr);
+        text = chars;
+        env->ReleaseStringUTFChars(result, chars);
+        env->DeleteLocalRef(result);
+    }
+    installed = text.compare(0, 8, "Couldn't") != 0;
+    return text;
+}
+
+std::string AndroidPlatform::TakeUpdateStatus()
+{
+    JNIEnv *env = nullptr;
+    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID take = env->GetMethodID(activityClass, "takeInstallStatus", "()Ljava/lang/String;");
+    env->DeleteLocalRef(activityClass);
+    auto result = static_cast<jstring>(env->CallObjectMethod(m_activity, take));
+    std::string text;
+    if (result)
+    {
+        const char *chars = env->GetStringUTFChars(result, nullptr);
+        text = chars;
+        env->ReleaseStringUTFChars(result, chars);
+        env->DeleteLocalRef(result);
+    }
+    return text;
+}
+
+void AndroidPlatform::OpenUrl(const std::string &url)
+{
+    JNIEnv *env = nullptr;
+    m_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID open = env->GetMethodID(activityClass, "openUrl", "(Ljava/lang/String;)V");
+    env->DeleteLocalRef(activityClass);
+    jstring urlJString = env->NewStringUTF(url.c_str());
+    env->CallVoidMethod(m_activity, open, urlJString);
+    env->DeleteLocalRef(urlJString);
 }
 
 std::vector<uint8_t> AndroidPlatform::LoadAssetBytes(const std::string &name)

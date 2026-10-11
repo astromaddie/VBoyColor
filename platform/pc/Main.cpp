@@ -52,7 +52,7 @@ int main()
 
     bool requestRestart = false;
     int exitCode = 0;
-    while (!quitRequested)
+    while (!quitRequested && !platform.RestartRequested())
     {
         try
         {
@@ -83,5 +83,7 @@ int main()
 
     app.Shutdown();
     std::printf("VBoy Color VR exiting\n");
+    if (platform.RestartRequested())
+        platform.Relaunch(); // (an update - see Updater)
     return exitCode;
 }

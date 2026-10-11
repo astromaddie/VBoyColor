@@ -89,7 +89,24 @@ DesktopPlatform::DesktopPlatform(const char *settingsFileName) : m_settingsFileN
 #endif
     std::error_code cwdEc;
     m_appFolder = ToU8(std::filesystem::current_path(cwdEc));
+#if defined(_WIN32)
+    if (length > 0 && length < sizeof(exe) / sizeof(exe[0]))
+        m_exePath = ToU8(std::filesystem::path(exe));
+#elif defined(__linux__)
+    if (!exe.empty())
+        m_exePath = ToU8(exe);
+#endif
     LoadFolders();
+    // What an update moved aside (the exe that was running then).
+    for (std::filesystem::directory_iterator it(U8(m_appFolder), cwdEc), end; !cwdEc && it != end; it.increment(cwdEc))
+    {
+        const std::string name = ToLower(ToU8(it->path().filename()));
+        if (name.size() > 8 && (name.compare(name.size() - 8, 8, ".exe.old") == 0 || name.compare(name.size() - 8, 8, ".dll.old") == 0))
+        {
+            std::error_code removeEc;
+            std::filesystem::remove(it->path(), removeEc);
+        }
+    }
 }
 
 std::vector<RomEntry> DesktopPlatform::ScanRoms()
@@ -481,7 +498,7 @@ std::vector<uint8_t> DesktopPlatform::LoadAssetBytes(const std::string &name)
 
 namespace
 {
-    constexpr size_t kMaxDownloadBytes = 16 * 1024 * 1024;
+    constexpr size_t kMaxDownloadBytes = 64 * 1024 * 1024; // (a release package fits easily)
 
 #if defined(_WIN32)
     bool HttpGet(const std::string &url, std::vector<uint8_t> &out)
@@ -565,20 +582,23 @@ struct DesktopPlatform::Download
     std::vector<uint8_t> bytes;
 };
 
-bool DesktopPlatform::StartDownload(const std::string &url)
+bool DesktopPlatform::StartDownload(const std::string &url, int slot)
 {
-    if (!m_download)
-        m_download = std::make_shared<Download>();
+    if (slot < 0 || slot > 1)
+        return false;
+    std::shared_ptr<Download> &download = m_download[slot];
+    if (!download)
+        download = std::make_shared<Download>();
     {
-        std::lock_guard<std::mutex> lock(m_download->mutex);
-        if (m_download->state == 0)
+        std::lock_guard<std::mutex> lock(download->mutex);
+        if (download->state == 0)
             return false;
-        m_download->state = 0;
-        m_download->bytes.clear();
+        download->state = 0;
+        download->bytes.clear();
     }
     // Detached: it only touches its own shared Download, so the app can
     // quit while one is still running.
-    std::thread([download = m_download, url]()
+    std::thread([download, url]()
                 {
                     std::vector<uint8_t> bytes;
                     const bool ok = HttpGet(url, bytes);
@@ -590,17 +610,18 @@ bool DesktopPlatform::StartDownload(const std::string &url)
     return true;
 }
 
-int DesktopPlatform::PollDownload(std::vector<uint8_t> &bytes)
+int DesktopPlatform::PollDownload(std::vector<uint8_t> &bytes, int slot)
 {
-    if (!m_download)
+    if (slot < 0 || slot > 1 || !m_download[slot])
         return -1;
-    std::lock_guard<std::mutex> lock(m_download->mutex);
-    const int state = m_download->state;
+    Download &download = *m_download[slot];
+    std::lock_guard<std::mutex> lock(download.mutex);
+    const int state = download.state;
     if (state == 1)
     {
-        bytes = std::move(m_download->bytes);
-        m_download->bytes.clear();
-        m_download->state = -1; // (reported once)
+        bytes = std::move(download.bytes);
+        download.bytes.clear();
+        download.state = -1; // (reported once)
     }
     return state;
 }

@@ -8,6 +8,7 @@ class AppMenu;
 struct AppSettings;
 class Platform;
 class ThumbnailLibrary;
+class Updater;
 
 enum class ButtonMappingProfile
 {
@@ -46,4 +47,6 @@ struct UiMenuResources
     bool passthroughSupported = false;
     // The library's games and their thumbnails (owned by AppMenu).
     ThumbnailLibrary *thumbnails = nullptr;
+    // Is there a newer VBoy Color (owned by AppMenu - see io/Updater.h).
+    Updater *updater = nullptr;
 };

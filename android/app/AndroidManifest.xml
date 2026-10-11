@@ -17,6 +17,10 @@
          libretro's thumbnails, from GitHub. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Updates: a new release's APK handed to the system's installer
+         (MainActivity.installUpdate - the player confirms it). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <queries>
         <provider android:authorities="org.khronos.openxr.runtime_broker;org.khronos.openxr.system_runtime_broker" />
         <intent>

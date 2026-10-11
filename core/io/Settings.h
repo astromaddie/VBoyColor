@@ -70,7 +70,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 19;
+    static constexpr int kVersion = 20;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -140,6 +140,10 @@ struct AppSettings
     // Version 19 (appended): Screen3D - the flat apps' 3D (off: the left
     // eye's picture).
     int screen3D = static_cast<int>(Screen3D::Off);
+
+    // Version 20 (appended): look for a new VBoy Color when the app starts
+    // (About - see core/io/Updater.h).
+    bool checkForUpdates = true;
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

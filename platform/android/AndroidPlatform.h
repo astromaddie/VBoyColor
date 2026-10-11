@@ -40,8 +40,14 @@ public:
     int GetBatteryPercent() const override;
 
     // MainActivity's download thread (startDownload/pollDownload/takeDownload).
-    bool StartDownload(const std::string &url) override;
-    int PollDownload(std::vector<uint8_t> &bytes) override;
+    bool StartDownload(const std::string &url, int slot = kDownloadBoxArt) override;
+    int PollDownload(std::vector<uint8_t> &bytes, int slot = kDownloadBoxArt) override;
+
+    // Updates: the APK to the system's installer (MainActivity.installUpdate).
+    const char *UpdatePackage() const override { return "android"; }
+    std::string InstallUpdate(const std::vector<uint8_t> &package, bool &installed) override;
+    std::string TakeUpdateStatus() override;
+    void OpenUrl(const std::string &url) override;
 
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 

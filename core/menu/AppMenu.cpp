@@ -189,6 +189,8 @@ void AppMenu::Initialize(UiRenderer &ui, VkFormat targetFormat, Emulator &emulat
     m_resources.passthroughSupported = passthroughSupported;
     m_thumbnails.Init(ui, platform, emulator, settings);
     m_resources.thumbnails = &m_thumbnails;
+    m_updater.Init(platform, kVersionString);
+    m_resources.updater = &m_updater;
     // Physical pixel size - kMenuWidth/kMenuHeight are logical units (see
     // AppMenuLayout.h); RenderToBuffer maps them onto this full-resolution
     // texture via BeginOffscreenFrame's logicalWidth/logicalHeight, so the
@@ -459,7 +461,10 @@ void AppMenu::SetPointer(bool present, float x, float y, bool down, float scroll
 
 float AppMenu::SidebarItemHeight(int item) const
 {
-    return kNavPitch + (item == SidebarResume && SidebarEnabled(SidebarResume) ? kNavSubtitleExtra : 0.0f);
+    return kNavPitch + ((item == SidebarResume && SidebarEnabled(SidebarResume)) ||
+                                (item == SidebarAbout && m_updater.UpdateAvailable())
+                            ? kNavSubtitleExtra
+                            : 0.0f);
 }
 
 float AppMenu::SidebarItemY(int item) const
@@ -618,6 +623,21 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
 
     // Thumbnails are made while the menu is open (the game paused).
     m_thumbnails.Update(m_open);
+
+    // A newer VBoy Color: one look a few seconds in (a development build
+    // only when asked - see Updater).
+    m_updater.Update();
+    m_sinceStart += deltaSeconds;
+    if (!m_autoChecked && m_sinceStart > 3.0f)
+    {
+        if (!m_resources.settings || !m_resources.settings->checkForUpdates || m_updater.IsDevBuild() || !m_updater.Supported())
+            m_autoChecked = true;
+        else
+        {
+            m_updater.Check();
+            m_autoChecked = m_updater.GetState() != Updater::State::Idle; // (else the download slot was busy - next frame)
+        }
+    }
 
     if (m_open && m_pendingPage)
     {
@@ -828,6 +848,9 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
             ui.DrawText(m_resources.captionFont, shown, 27.0f, TextY(ui, m_resources.captionFont, y + 15.0f), 1.0f,
                         kMenuDimTextColor);
         }
+        if (i == SidebarAbout && m_updater.UpdateAvailable())
+            ui.DrawText(m_resources.captionFont, "Update available", 27.0f, TextY(ui, m_resources.captionFont, y + 15.0f), 1.0f,
+                        kMenuSelectionColor);
     }
 
     // The clock (and battery).

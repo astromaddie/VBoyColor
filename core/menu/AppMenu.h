@@ -2,6 +2,7 @@
 
 #include "menu/MenuPage.h"
 #include "menu/ThumbnailLibrary.h"
+#include "io/Updater.h"
 #include "menu/pages/AppMenuLayout.h"
 #include "menu/pages/LibraryPage.h"
 #include "menu/pages/SaveStatesPage.h"
@@ -178,6 +179,11 @@ private:
     AboutPage m_aboutPage;
 
     ThumbnailLibrary m_thumbnails;
+    // A newer VBoy Color: checked once a few seconds after the start (if
+    // Settings say so - About has the switch), or from About.
+    Updater m_updater;
+    float m_sinceStart = 0.0f;
+    bool m_autoChecked = false;
 
     MenuPage *m_currentPage = nullptr;
     MenuPage *m_nextPage = nullptr;

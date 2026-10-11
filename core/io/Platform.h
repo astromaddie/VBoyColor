@@ -92,13 +92,40 @@ public:
     // 0-100 device battery level, -1 if unavailable.
     virtual int GetBatteryPercent() const = 0;
 
-    // Fetches an https URL in the background (the library's optional box
-    // art) - one download at a time. False if this platform can't, or one
-    // is still running.
-    virtual bool StartDownload(const std::string & /*url*/) { return false; }
-    // The download started last: 0 still running, 1 done (bytes filled -
-    // reported once), -1 failed or none.
-    virtual int PollDownload(std::vector<uint8_t> & /*bytes*/) { return -1; }
+    // Fetches an https URL in the background - one download at a time per
+    // slot: kDownloadBoxArt (the library's optional box art) and
+    // kDownloadUpdates (the updater's). False if this platform can't, or the
+    // slot's download is still running.
+    static constexpr int kDownloadBoxArt = 0, kDownloadUpdates = 1;
+    virtual bool StartDownload(const std::string & /*url*/, int /*slot*/ = kDownloadBoxArt) { return false; }
+    // The slot's download started last: 0 still running, 1 done (bytes
+    // filled - reported once), -1 failed or none.
+    virtual int PollDownload(std::vector<uint8_t> & /*bytes*/, int /*slot*/ = kDownloadBoxArt) { return -1; }
+
+    // ---- Updates (core/io/Updater.h) ----
+
+    // Which release download is this app's: "windows" (the .zip), "linux"
+    // (the .tar.gz), "android" (the .apk) - "" where it can't update itself.
+    virtual const char *UpdatePackage() const { return ""; }
+    // Puts a downloaded release package in place. Desktop: replaces the
+    // app's files (the running exe moved aside) and asks for a restart
+    // (RestartRequested); Android: hands the APK to the system's installer
+    // (on a headset when the app next starts). Returns a line for the menu;
+    // installed: it's in place (or with the installer).
+    virtual std::string InstallUpdate(const std::vector<uint8_t> & /*package*/, bool &installed)
+    {
+        installed = false;
+        return "This version can't update itself";
+    }
+    // How an install that finishes later went (Android's installer), once -
+    // "" until then.
+    virtual std::string TakeUpdateStatus() { return ""; }
+    // The app should close and start again (an update is in place) - the
+    // main loop ends, cleans up as usual, then calls Relaunch.
+    virtual bool RestartRequested() const { return false; }
+    virtual void RequestRestart() {}
+    // Opens a web page in the system's browser.
+    virtual void OpenUrl(const std::string & /*url*/) {}
 
     // Loads a bundled app asset (font/icon/image) - APK assets on Android,
     // a file next to the running executable on desktop. Empty if not found.

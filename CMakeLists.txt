@@ -64,6 +64,11 @@ set(VOLK_PULL_IN_VULKAN OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(volk)
 target_link_libraries(volk PUBLIC Vulkan-Headers)
 
+# On Linux the loader is built into the app (not a .so next to it): the
+# release tarball then runs on any machine, OpenXR installed or not.
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(DYNAMIC_LOADER OFF CACHE BOOL "" FORCE)
+endif()
 FetchContent_Declare(
     OpenXR-SDK
     GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
@@ -269,6 +274,7 @@ add_library(vbgo_app STATIC
     core/input/ButtonMapping.cpp
     core/io/Settings.cpp
     core/io/DataFolders.cpp
+    core/io/Updater.cpp
     core/input/TouchControls.cpp
 )
 target_include_directories(vbgo_app PUBLIC core ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/platform)
@@ -301,9 +307,9 @@ if(ANDROID)
     target_compile_definitions(vbgo_app PUBLIC XR_USE_PLATFORM_ANDROID)
     target_sources(vbgo_app PRIVATE platform/android/AndroidPlatform.cpp)
 else()
-    target_sources(vbgo_app PRIVATE platform/desktop/DesktopPlatform.cpp)
+    target_sources(vbgo_app PRIVATE platform/desktop/DesktopPlatform.cpp platform/desktop/DesktopUpdate.cpp)
     if(WIN32)
-        target_link_libraries(vbgo_app PUBLIC winhttp) # (DesktopPlatform's downloads)
+        target_link_libraries(vbgo_app PUBLIC winhttp shell32) # (DesktopPlatform's downloads, opening web pages)
     endif()
 endif()
 
