@@ -20,11 +20,28 @@ with touch controls or a gamepad.
 pack).*
 
 ![Galactic Pinball](images/galactic-pinball.png)
+<sub>**Galactic Pinball** - the Colony table: bumpers, rails and targets each in their own color.</sub>
+
 ![Mario Clash](images/mario-clash.png)
+<sub>**Mario Clash** - green pipes, grey ledges and the brick wall behind them.</sub>
+
 ![Wario Land](images/wario-land.png)
+<sub>**Wario Land** - the cave in warm orange, the blocks in teal.</sub>
+
 ![Teleroboxer](images/teleroboxer.png)
+<sub>**Teleroboxer** - the robot in steel, gold and red.</sub>
+
 ![Jack Bros.](images/jack-bros.png)
+<sub>**Jack Bros.** - Jack Frost in blue and white, his face touched up by hand to match the Virtual Boy's drawing.</sub>
+
 ![Mario's Tennis](images/marios-tennis.png)
+<sub>**Mario's Tennis** - a clay court under a green skyline.</sub>
+
+![Teleroboxer for colored 3D glasses](images/3d-glasses.png)
+<sub>**3D with colored glasses** (Teleroboxer, PC and phones) - red / cyan on the left, amber / blue on the right; green / magenta too.</sub>
+
+![Mario's Tennis side by side](images/3d-side-by-side.png)
+<sub>**3D side by side** (Mario's Tennis, PC and phones) - the left eye's picture next to the right eye's, for a 3D TV or parallel viewing; also squeezed for a 3D TV, cross-eyed, and top and bottom.</sub>
 
 ## Features
 
@@ -89,10 +106,7 @@ pack).*
   expects -, full, or cross-eyed), *top and bottom* (3D TV or full), or
   *colored glasses* - *red / cyan*, *green / magenta* or *amber / blue*
   (mixed with Dubois' method, which keeps the games' colors as true as the
-  glasses allow).
-
-  <p align="center"><img src="images/3d-glasses.gif" alt="Teleroboxer for colored 3D glasses: red / cyan, green / magenta, amber / blue" width="384">
-  <img src="images/3d-side-by-side.gif" alt="Mario's Tennis side by side (full, 3D TV, cross-eyed) and top and bottom (full, 3D TV)" width="384"></p>
+  glasses allow). Pictures of both at the top of this page.
 - **Your room as the background** (Quest) - Settings → Adjust screen →
   Show your room around it: the game floats in your room (passthrough)
   instead of in the dark.
