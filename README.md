@@ -40,8 +40,8 @@ pack).*
 ![Teleroboxer for colored 3D glasses](images/3d-glasses.png)
 <sub>**3D with colored glasses** (Teleroboxer, PC and phones) - red / cyan on the left, amber / blue on the right; green / magenta too.</sub>
 
-![Mario's Tennis side by side](images/3d-side-by-side.png)
-<sub>**3D side by side** (Mario's Tennis, PC and phones) - the left eye's picture next to the right eye's, for a 3D TV or parallel viewing; also squeezed for a 3D TV, cross-eyed, and top and bottom.</sub>
+![Vertical Force side by side](images/3d-side-by-side.png)
+<sub>**3D side by side** (Vertical Force, PC and phones) - the left eye's picture next to the right eye's, for a 3D TV or parallel viewing; also squeezed for a 3D TV, cross-eyed, and top and bottom.</sub>
 
 ## Features
 
