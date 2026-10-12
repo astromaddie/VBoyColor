@@ -123,8 +123,9 @@ pack).*
   Show your room around it: the game floats in your room (passthrough)
   instead of in the dark.
 - **Updates** - VBoy Color looks for a new version when it starts (About →
-  Check when VBoy Color starts) and shows *Update available* in the
-  sidebar; About → Update installs it. On PC the app replaces its own files
+  Check when VBoy Color starts): a notice pops up over the game or the menu
+  when there is one, and the sidebar shows *Update available*; About →
+  Update installs it. On PC the app replaces its own files
   (your games and saves stay) and restarts; on Android the system's
   installer takes the new APK (allow VBoy Color to install apps once; on the
   Quest it installs when the app next starts). A beta looks for betas too,
@@ -190,6 +191,17 @@ game can have its own layout (hold its card in the library). Connect a
 gamepad and the on-screen buttons step aside until you touch the screen
 again. Back opens the menu, and Back (or *Back to game*) returns to the
 game. With no game loaded, the menu sits inside a Virtual Boy.
+
+### Android TV and Fire TV
+
+The same APK runs on Android TV boxes and Fire TV (64-bit ARM, with
+Vulkan), played with a gamepad. TVs have no browser to download it with, so
+install the **Downloader** app (by AFTVnews) from the TV's app store, type
+in the APK's link from [Releases](https://github.com/yuk27/VBoyColor/releases)
+and allow Downloader to install apps when the TV asks. Pick the folder with
+your `.vb` ROMs (a USB stick works) when VBoy Color asks. The gamepad opens
+the menu with Select + Start held together (or Guide), and **Quit** at the
+bottom of the menu's sidebar closes the app.
 
 ### Windows
 
@@ -264,8 +276,9 @@ sidebar - press twice.
 
 ## Building
 
-See [docs/BUILDING.md](docs/BUILDING.md) - Windows, Linux and Quest, all from
-one CMake project. Every push is built by GitHub Actions.
+See [docs/BUILDING.md](docs/BUILDING.md) - the Windows and Linux apps, PC VR,
+the Android app (Quest, phones and TVs) and the RetroArch core, all from one
+CMake project. Every push is built by GitHub Actions.
 
 ## Support the project
 
