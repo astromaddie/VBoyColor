@@ -204,9 +204,11 @@ ARM64), macOS or Android from
 1. Copy the core (`vboycolor_libretro.dll`, `.so` or `.dylib`) into
    RetroArch's cores folder (Settings → Directory → Cores shows where it is),
    and `vboycolor_libretro.info` into its core info folder (Settings →
-   Directory → Core Info), so the menus show its name and details. On
-   Android, use Load Core → Install or Restore a Core and pick
-   `vboycolor_libretro_android.so`.
+   Directory → Core Info). Don't skip the `.info`: RetroArch's file browser
+   only lists the file types that the installed cores' `.info` files name,
+   so without it Load Content shows a folder's `.zip` files but hides its
+   `.vb` games. On Android, use Load Core → Install or Restore a Core and
+   pick `vboycolor_libretro_android.so`.
 2. Load Core → **Nintendo - Virtual Boy (VBoy Color)**, then load a game.
 3. Quick Menu → Core Options: **Colors** (the game's own, Auto,
    Multicolor, Gradient or Tint, and their palettes), **Color packs**, and

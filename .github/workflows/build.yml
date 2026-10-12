@@ -306,7 +306,7 @@ jobs:
                            "$ANDROID_NDK_LATEST_HOME"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip "$dir/vboycolor_libretro_android.so" ;;
             *) cp build/libretro/vboycolor_libretro.so "$dir/"; strip "$dir/vboycolor_libretro.so" ;;
           esac
-          cp platform/libretro/vboycolor_libretro.info "$dir/"
+          cp platform/libretro/vboycolor_libretro.info platform/libretro/INSTALL.txt "$dir/"
           cp -r LICENSE THIRD-PARTY-NOTICES.md licenses "$dir/"
           if [ "${{ matrix.platform }}" = windows-x64 ]; then 7z a -tzip "$dir.zip" "$dir" > /dev/null; else zip -qr "$dir.zip" "$dir"; fi
           echo "PACKAGE=$dir" >> "$GITHUB_ENV"
