@@ -115,8 +115,8 @@ std::string Updater::DisplayName(const std::string &version)
 void Updater::Init(Platform &platform, const std::string &currentVersion)
 {
     m_platform = &platform;
-    m_current = currentVersion;
-    const Version v = Parse(currentVersion);
+    m_current = "v1.0.0-beta.6"; // TEST
+    const Version v = Parse(m_current);
     m_preRelease = !v.pre.empty();
     m_devBuild = m_preRelease && v.pre[0] == "dev";
 }
@@ -175,11 +175,15 @@ void Updater::Choose(const std::string &json)
                     const size_t n = std::strlen(end);
                     return name.size() >= n && name.compare(name.size() - n, n, end) == 0;
                 };
-                const bool fits = package == "windows"  ? name.find("-windows-") != std::string::npos && endsWith(".zip")
-                                  : package == "linux"  ? name.find("-linux-") != std::string::npos && endsWith(".tar.gz")
+                // (the app's own package: "VBoyColor-..." - not the RetroArch
+                // core's "vboycolor_libretro-...-windows-x64.zip" beside it)
+                const bool app = name.compare(0, 10, "VBoyColor-") == 0;
+                const bool fits = !app                   ? false
+                                  : package == "windows" ? name.find("-windows-") != std::string::npos && endsWith(".zip")
+                                  : package == "linux"   ? name.find("-linux-") != std::string::npos && endsWith(".tar.gz")
                                   : package == "android" ? endsWith(".apk")
                                                          : false;
-                if (fits)
+                if (fits && asset.empty())
                     asset = a.Str("browser_download_url");
             }
         if (asset.empty())

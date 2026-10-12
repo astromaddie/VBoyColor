@@ -709,6 +709,12 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
             m_autoChecked = m_updater.GetState() != Updater::State::Idle; // (else the download slot was busy - next frame)
         }
     }
+    // ... and when that check finds one, a notice says so (once).
+    if (m_autoChecked && !m_updateNoticeShown && m_updater.GetState() == Updater::State::Available && !m_updater.IsDevBuild())
+    {
+        m_updateNoticePending = true;
+        m_updateNoticeShown = true;
+    }
 
     if (m_open && m_pendingPage)
     {
@@ -994,7 +1000,7 @@ void AppMenu::RenderToBuffer(UiRenderer &ui)
 
 void AppMenu::Draw(UiRenderer &ui, float x, float y, float squeezeX, float squeezeY)
 {
-    if (NoticeShowing())
+    if (NoticeShowing() && !IsVisible())
         DrawNotice(ui, x, y, squeezeX, squeezeY);
     if (m_visibility <= 0.0f)
         return; // fully closed - nothing to composite
@@ -1019,6 +1025,9 @@ void AppMenu::Draw(UiRenderer &ui, float x, float y, float squeezeX, float squee
     ui.DrawImageRounded(m_offscreenTexture, x + (fullW - w) / 2.0f * squeezeX, y + (fullH - h) / 2.0f * squeezeY,
                         w * squeezeX, h * squeezeY, kPanelCornerRadiusPx * m_menuScale * std::min(squeezeX, squeezeY),
                         eased);
+    // (a notice of the app's own: on top of the menu, at its bottom)
+    if (NoticeShowing())
+        DrawNotice(ui, x, y, squeezeX, squeezeY);
 }
 
 // -----------------------------------------------------------------------
@@ -1028,13 +1037,29 @@ void AppMenu::Draw(UiRenderer &ui, float x, float y, float squeezeX, float squee
 
 void AppMenu::UpdateNotice(float deltaSeconds)
 {
-    if (!m_resources.emulator || !m_ui)
+    if (!m_ui)
         return;
     if (!m_notice.active)
     {
         Achievements::Notice notice;
-        if (!m_resources.emulator->GetAchievements().TakeNotice(notice))
+        if (m_updateNoticePending)
+        {
+            // A newer VBoy Color (the check at start found it).
+            m_updateNoticePending = false;
+            notice.caption = "Update available";
+            notice.title = "VBoy Color " + m_updater.LatestName() + " is out";
+            notice.text = "About > Update installs it";
+            notice.seconds = 7.0f;
+            m_notice.icon = UiIconId::Load;
+            m_notice.overMenu = true;
+        }
+        else if (!m_resources.emulator || !m_resources.emulator->GetAchievements().TakeNotice(notice))
             return;
+        else
+        {
+            m_notice.icon = UiIconId::None;
+            m_notice.overMenu = false;
+        }
         m_notice.active = true;
         m_notice.notice = std::move(notice);
         m_notice.age = 0.0f;
@@ -1044,7 +1069,7 @@ void AppMenu::UpdateNotice(float deltaSeconds)
         m_ui->EnsureGlyphsForText(m_resources.captionFont, m_notice.notice.text + "\xE2\x80\xA6");
         return;
     }
-    if (IsVisible())
+    if (IsVisible() && !m_notice.overMenu)
         return; // (waits for the game)
     m_notice.age += deltaSeconds;
     if (m_notice.age >= m_notice.notice.seconds)
@@ -1061,7 +1086,12 @@ void AppMenu::RenderNotice(UiRenderer &ui)
     constexpr float kBadge = 28.0f, kPad = 6.0f;
     const Achievements *achievements = m_resources.emulator ? &m_resources.emulator->GetAchievements() : nullptr;
     float u0, v0, u1, v1;
-    if (achievements && achievements->BadgeUv(n.badge, u0, v0, u1, v1))
+    if (m_notice.icon != UiIconId::None)
+    {
+        ui.DrawQuadRounded(kPad, kPad, kBadge, kBadge, {0.2f, 0.215f, 0.28f, 1.0f}, 4.0f);
+        m_icons.Draw(ui, m_notice.icon, kPad + 6.0f, kPad + 6.0f, kBadge - 12.0f, 1.0f, kMenuSelectionColor);
+    }
+    else if (achievements && achievements->BadgeUv(n.badge, u0, v0, u1, v1))
         ui.DrawImageRegion(achievements->BadgeAtlas(), kPad, kPad, kBadge, kBadge, u0, v0, u1, v1);
     else
     {
@@ -1102,7 +1132,12 @@ void AppMenu::DrawNotice(UiRenderer &ui, float x, float y, float squeezeX, float
     const float slide = (1.0f - std::sin(in * 1.5707963f)) * -8.0f;
     const float w = kNoticeWidth * m_menuScale, h = kNoticeHeight * m_menuScale;
     const float nx = x + (kMenuWidth * m_menuScale - w) / 2.0f * squeezeX;
-    const float ny = y + (6.0f + slide) * m_menuScale * squeezeY;
+    // (over the game: at the top; over the menu: at its bottom, over the hints)
+    const float top = IsVisible() ? kMenuHeight - kNoticeHeight - 6.0f - slide : 6.0f + slide;
+    const float ny = y + top * m_menuScale * squeezeY;
+    if (IsVisible()) // (over the menu: a solid backing, so the rows under it don't show through)
+        ui.DrawQuadRounded(nx, ny, w * squeezeX, h * squeezeY, {0.09f, 0.095f, 0.13f, alpha * m_visibility},
+                           8.0f * m_menuScale * std::min(squeezeX, squeezeY));
     ui.DrawImageRounded(m_noticeTexture, nx, ny, w * squeezeX, h * squeezeY, 8.0f * m_menuScale * std::min(squeezeX, squeezeY),
                         alpha);
 }

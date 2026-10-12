@@ -160,7 +160,7 @@ public:
     // (an achievement unlocked - see Achievements::TakeNotice). Platforms call
     // RenderToBuffer and Draw while this is true (not only while visible).
     bool NeedsDraw() const { return IsVisible() || NoticeShowing(); }
-    bool NoticeShowing() const { return m_notice.active && !IsVisible(); }
+    bool NoticeShowing() const { return m_notice.active && (!IsVisible() || m_notice.overMenu); }
 
     // Typing on a real keyboard (the window app): while a text field is open
     // (WantsText), its characters (UTF-8), Backspace and Enter go to it - and
@@ -281,7 +281,14 @@ private:
         bool active = false;
         Achievements::Notice notice;
         float age = 0; // seconds shown
+        // A notice of the app's own (a newer VBoy Color): its icon instead of
+        // a badge, and shown over the menu too (at its bottom) - an
+        // achievement's waits for the game.
+        UiIconId icon = UiIconId::None;
+        bool overMenu = false;
     } m_notice;
+    // A newer VBoy Color turned up on the check at start: tell once.
+    bool m_updateNoticePending = false, m_updateNoticeShown = false;
     UiImageHandle m_noticeTexture;
     float m_menuScale = kMenuScale; // see SetMenuScale
     std::string m_versionLine1, m_versionLine2;

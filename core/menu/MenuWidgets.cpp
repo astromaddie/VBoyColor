@@ -910,7 +910,38 @@ void MenuList::Draw(UiRenderer &ui, float offsetX, float offsetY, float alpha)
         else if (hasIcon)
             m_icons->Draw(ui, entry.icon, iconX, centerY - kIconSize / 2.0f, kIconSize, alpha, iconTint);
         if (entry.subtitle.empty())
-            ui.DrawText(labelFont, label, labelX, TextY(ui, labelFont, centerY), 1.0f, textColor);
+        {
+            // (cut short with "..." where it would run into the value, the
+            // toggle or the chevron on the right)
+            const bool adjustableRow = entry.leftFunction || entry.rightFunction;
+            float rightEdge = x + w - kRowPad;
+            if (entry.twoColumn)
+                rightEdge = labelX + 1e6f;
+            else if (entry.toggle)
+                rightEdge -= 18.0f + 6.0f;
+            else
+            {
+                if (adjustableRow || entry.opensPage)
+                    rightEdge -= kChevronWidth;
+                if (!entry.value.empty())
+                    rightEdge -= ui.GetTextWidth(m_font, entry.value) + 8.0f + (sel && adjustableRow ? kChevronWidth : 0.0f);
+            }
+            std::string shown = label;
+            const float room = rightEdge - labelX;
+            if (room > 10.0f && ui.GetTextWidth(labelFont, shown) > room)
+            {
+                while (!shown.empty() && ui.GetTextWidth(labelFont, shown + "\xE2\x80\xA6") > room)
+                    shown.pop_back();
+                while (!shown.empty() && (static_cast<unsigned char>(shown.back()) & 0xC0) == 0x80)
+                    shown.pop_back(); // (not in the middle of a character)
+                if (!shown.empty() && (static_cast<unsigned char>(shown.back()) & 0x80))
+                    shown.pop_back();
+                while (!shown.empty() && shown.back() == ' ')
+                    shown.pop_back();
+                shown += "\xE2\x80\xA6";
+            }
+            ui.DrawText(labelFont, shown, labelX, TextY(ui, labelFont, centerY), 1.0f, textColor);
+        }
         else
         {
             // The label on top, the subtitle under it - word-wrapped, two

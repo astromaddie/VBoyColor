@@ -256,7 +256,7 @@ std::string DesktopPlatform::InstallUpdate(const std::vector<uint8_t> &package, 
     for (const PackageFile &file : files)
         hasApp |= file.path == exeName;
     if (!read || !hasApp)
-        return "The download isn't a VBoy Color package - nothing changed";
+        return "Not a VBoy Color package - nothing changed";
 
     const std::filesystem::path app = U8(m_appFolder);
     int written = 0;
@@ -273,7 +273,7 @@ std::string DesktopPlatform::InstallUpdate(const std::vector<uint8_t> &package, 
                 continue;
         }
         if (!Replace(target, file))
-            return written ? "The update stopped partway - get it from the release page" : "Can't write to VBoy Color's folder - nothing changed";
+            return written ? "Stopped partway - get it from the release page" : "Can't write to the app's folder - nothing changed";
         ++written;
     }
     installed = true;

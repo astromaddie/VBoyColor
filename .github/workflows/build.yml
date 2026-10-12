@@ -297,7 +297,10 @@ jobs:
         run: |
           set -e
           version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build/libretro/generated/Version.h)
-          dir=vboycolor_libretro-$version-${{ matrix.platform }}
+          # (Windows: "win64", not "windows-x64" - the app's updater up to
+          # 1.0.0 beta 7 takes any release zip named "-windows-" for its own)
+          name=${{ matrix.platform }}; [ "$name" = windows-x64 ] && name=win64
+          dir=vboycolor_libretro-$version-$name
           mkdir -p "$dir"
           case "${{ matrix.platform }}" in
             windows-x64) cp build/libretro/Release/vboycolor_libretro.dll "$dir/" ;;
