@@ -52,6 +52,12 @@ public:
     std::string InstallUpdate(const std::vector<uint8_t> &package, bool &installed) override;
     std::string TakeUpdateStatus() override;
     void OpenUrl(const std::string &url) override;
+    // Quit: the phone or TV app only (SetCanQuit - a headset's own menu
+    // closes apps). MainActivity.finish(), then the main loop ends.
+    void SetCanQuit(bool can) { m_canQuit = can; }
+    bool CanQuit() const override { return m_canQuit; }
+    void RequestQuit() override;
+    bool QuitRequested() const override { return m_quit; }
 
     // The clipboard: Android's ClipboardManager (MainActivity.getClipboardText
     // / setClipboardText) - UTF-8 both ways as bytes, as JNI's own strings
@@ -77,4 +83,5 @@ private:
     std::set<int> m_httpIds;      // web requests still to be reported
     int m_nextHttpId = 0;
     AAssetManager *m_assetManager = nullptr;
+    bool m_canQuit = false, m_quit = false;
 };

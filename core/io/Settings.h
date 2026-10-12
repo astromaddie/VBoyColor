@@ -1,5 +1,7 @@
 #pragma once
 
+#include "input/Hotkeys.h"
+
 #include "emu/ColorSchemes.h"
 #include "input/ButtonMapping.h"
 
@@ -102,7 +104,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 21;
+    static constexpr int kVersion = 22;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -181,6 +183,15 @@ struct AppSettings
     // gamepad's A/B by position (ButtonMapper::MigrateGamepadAToPosition) -
     // set once that has run.
     bool gamepadByPosition = false;
+
+    // Version 22 (appended): the window app's hotkeys (Settings > Hotkeys -
+    // see input/Hotkeys.h), indexed by HotkeyAction - their defaults filled
+    // in once (hotkeysSet) - and whether F4 to F12 are the color pack and
+    // video tools' (captures, re-import, recording... - see
+    // platform/pc2d/Main.cpp) instead of hotkeys'.
+    bool paintingTools = false;
+    bool hotkeysSet = false;
+    Hotkey hotkeys[kHotkeySlots];
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

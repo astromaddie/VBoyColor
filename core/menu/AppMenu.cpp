@@ -51,7 +51,7 @@ namespace
 
     // The sidebar's pages.
     constexpr float kNavTop = 46.0f;
-    constexpr float kNavPitch = 20.0f;
+    constexpr float kNavPitch = 19.0f; // (room for Close game and Quit above the clock)
     constexpr float kNavSubtitleExtra = 7.0f; // (Resume shows the game under it)
     constexpr float kNavIconSize = 10.0f;
     // A notice over the game (an achievement unlocked), in the menu's logical units.
@@ -190,6 +190,14 @@ void AppMenu::Initialize(UiRenderer &ui, VkFormat targetFormat, Emulator &emulat
     m_resources.emulator = &emulator;
     m_resources.appMenu = this;
     m_resources.settings = &settings;
+    // The window app's hotkeys start as their defaults (once - after that
+    // they're the player's, cleared ones too).
+    if (mappingProfile == ButtonMappingProfile::Desktop && !settings.hotkeysSet)
+    {
+        for (int i = 0; i < kHotkeySlots; ++i)
+            settings.hotkeys[i] = i < kHotkeyActionCount ? DefaultHotkey(static_cast<HotkeyAction>(i)) : Hotkey{};
+        settings.hotkeysSet = true;
+    }
     m_resources.buttonMappingProfile = mappingProfile;
     m_resources.passthroughSupported = passthroughSupported;
     m_thumbnails.Init(ui, platform, emulator, settings);
@@ -321,8 +329,9 @@ void AppMenu::RebuildLogo(UiRenderer &ui)
 
 void AppMenu::InitPages(UiRenderer &ui)
 {
-    MenuPage *pages[] = {&m_libraryPage, &m_saveStatesPage, &m_settingsPage, &m_emulatorButtonMapPage, &m_moveScreenPage,
-                         &m_folderPage, &m_gameControlsPage, &m_aboutPage, &m_achievementsPage, &m_textInputPage};
+    MenuPage *pages[] = {&m_libraryPage,      &m_saveStatesPage, &m_settingsPage, &m_emulatorButtonMapPage,
+                         &m_moveScreenPage,   &m_folderPage,     &m_gameControlsPage, &m_aboutPage,
+                         &m_achievementsPage, &m_textInputPage,  &m_hotkeysPage};
     for (MenuPage *page : pages)
     {
         page->Navigate = [this](MenuPage *target, int dir) { StartTransition(target, dir); };
@@ -339,6 +348,7 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_aboutPage.sidebarItem = SidebarAbout;
     m_achievementsPage.sidebarItem = SidebarAchievements;
     m_textInputPage.sidebarItem = SidebarAchievements;
+    m_hotkeysPage.sidebarItem = SidebarSettings;
 
     // Cross-page links
     m_settingsPage.emulatorButtonMapPage = &m_emulatorButtonMapPage;
@@ -346,6 +356,8 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_emulatorButtonMapPage.settingsPage = &m_settingsPage;
     m_moveScreenPage.settingsPage = &m_settingsPage;
     m_settingsPage.folderPage = &m_folderPage;
+    m_settingsPage.hotkeysPage = &m_hotkeysPage;
+    m_hotkeysPage.settingsPage = &m_settingsPage;
     m_libraryPage.gameControlsPage = &m_gameControlsPage;
     m_gameControlsPage.libraryPage = &m_libraryPage;
     m_gameControlsPage.buttonMapPage = &m_emulatorButtonMapPage;
@@ -395,11 +407,20 @@ MenuPage *AppMenu::PageFor(int item)
     }
 }
 
+bool AppMenu::SidebarVisible(int item) const
+{
+    if (item == SidebarCloseGame)
+        return m_resources.emulator && m_resources.emulator->HasGame();
+    if (item == SidebarQuit)
+        return m_resources.platform && m_resources.platform->CanQuit();
+    return item >= 0 && item < SidebarCount;
+}
+
 bool AppMenu::SidebarEnabled(int item) const
 {
     if (item == SidebarResume || item == SidebarSaveStates)
         return m_resources.emulator && m_resources.emulator->HasGame();
-    return item >= 0 && item < SidebarCount;
+    return SidebarVisible(item);
 }
 
 void AppMenu::StartTransition(MenuPage *target, int dir, bool vertical)
@@ -447,6 +468,7 @@ void AppMenu::MoveSidebar(int dir)
     if (next < 0 || next >= SidebarCount)
         return;
     m_sidebarCursor = next;
+    m_confirmItem = -1; // (moved away: not asked any more)
     // The page shows as soon as the cursor's on it.
     MenuPage *page = PageFor(next);
     if (page && TargetPage()->sidebarItem != next)
@@ -461,6 +483,24 @@ void AppMenu::ActivateSidebar(bool pressedA)
             Hide();
         return;
     }
+    if (m_sidebarCursor == SidebarCloseGame || m_sidebarCursor == SidebarQuit)
+    {
+        // (A only - Right just moves on; asked first, done on a second press)
+        if (!pressedA || !SidebarEnabled(m_sidebarCursor))
+            return;
+        if (m_confirmItem != m_sidebarCursor)
+        {
+            m_confirmItem = m_sidebarCursor;
+            m_confirmSeconds = 3.0f;
+            return;
+        }
+        m_confirmItem = -1;
+        if (m_sidebarCursor == SidebarCloseGame)
+            CloseGame();
+        else
+            Quit();
+        return;
+    }
     MenuPage *page = PageFor(m_sidebarCursor);
     if (!page)
         return;
@@ -468,6 +508,32 @@ void AppMenu::ActivateSidebar(bool pressedA)
         GoTo(page, m_sidebarCursor > TargetPage()->sidebarItem ? 1 : -1);
     if (TargetPage()->HasFocusable())
         FocusContent();
+}
+
+void AppMenu::CloseGame()
+{
+    if (!m_resources.emulator || !m_resources.emulator->CloseGame())
+        return;
+    // The library, nothing running.
+    m_sidebarCursor = SidebarLibrary;
+    GoTo(&m_libraryPage, -1);
+    if (m_libraryPage.HasFocusable())
+        FocusContent();
+    else
+        FocusSidebar();
+    Show();
+}
+
+void AppMenu::Quit()
+{
+    if (!m_resources.platform || !m_resources.platform->CanQuit())
+        return;
+    // (the game's battery save now - the rest is written as on any close)
+    if (m_resources.emulator && m_resources.emulator->HasGame())
+        m_resources.emulator->SaveRamNow();
+    if (m_resources.settings)
+        m_resources.settings->Save(*m_resources.platform);
+    m_resources.platform->RequestQuit();
 }
 
 void AppMenu::FocusSidebar()
@@ -509,8 +575,10 @@ void AppMenu::SetPointer(bool present, float x, float y, bool down, float scroll
 
 float AppMenu::SidebarItemHeight(int item) const
 {
+    if (!SidebarVisible(item))
+        return 0.0f;
     return kNavPitch + ((item == SidebarResume && SidebarEnabled(SidebarResume)) ||
-                                (item == SidebarAbout && m_updater.UpdateAvailable())
+                                (item == SidebarAbout && m_updater.UpdateAvailable()) || item == m_confirmItem
                             ? kNavSubtitleExtra
                             : 0.0f);
 }
@@ -695,6 +763,14 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
         m_resources.emulator->GetAchievements().Update(deltaSeconds, !m_open && m_resources.emulator->HasGame());
     UpdateNotice(deltaSeconds);
 
+    // (Close game / Quit asked: forgotten after a while, or with the sidebar left)
+    if (m_confirmItem >= 0)
+    {
+        m_confirmSeconds -= deltaSeconds;
+        if (m_confirmSeconds <= 0.0f || !m_open || !m_sidebarFocus || m_sidebarCursor != m_confirmItem)
+            m_confirmItem = -1;
+    }
+
     // A newer VBoy Color: one look a few seconds in (a development build
     // only when asked - see Updater).
     m_updater.Update();
@@ -712,8 +788,13 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
     // ... and when that check finds one, a notice says so (once).
     if (m_autoChecked && !m_updateNoticeShown && m_updater.GetState() == Updater::State::Available && !m_updater.IsDevBuild())
     {
-        m_updateNoticePending = true;
         m_updateNoticeShown = true;
+        Achievements::Notice notice;
+        notice.caption = "Update available";
+        notice.title = "VBoy Color " + m_updater.LatestName() + " is out";
+        notice.text = "About > Update installs it";
+        notice.seconds = 7.0f;
+        m_appNotices.push_back({std::move(notice), UiIconId::Load, false});
     }
 
     if (m_open && m_pendingPage)
@@ -807,6 +888,11 @@ std::vector<MenuHint> AppMenu::CurrentHints() const
         std::vector<MenuHint> hints;
         if (m_sidebarCursor == SidebarResume)
             hints.push_back({UiIconId::ButtonA, "Resume"});
+        else if (m_sidebarCursor == SidebarCloseGame || m_sidebarCursor == SidebarQuit)
+        {
+            const bool asked = m_confirmItem == m_sidebarCursor, quit = m_sidebarCursor == SidebarQuit;
+            hints.push_back({UiIconId::ButtonA, asked ? (quit ? "Yes, quit" : "Yes, close it") : quit ? "Quit" : "Close game"});
+        }
         else if (TargetPage() && TargetPage()->HasFocusable())
             hints.push_back({UiIconId::ButtonA, "Open"});
         if (game)
@@ -897,12 +983,15 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
 
     // The pages.
     static constexpr const char *kNames[SidebarCount] = {"Resume", "Library", "Save states", "Achievements", "Settings",
-                                                         "About"};
-    static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::Resume, UiIconId::RomList, UiIconId::SaveSlot,
-                                                      UiIconId::Trophy, UiIconId::Settings, UiIconId::Header};
+                                                         "About",  "Close game", "Quit"};
+    static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::Resume,   UiIconId::RomList, UiIconId::SaveSlot,
+                                                      UiIconId::Trophy,   UiIconId::Settings, UiIconId::Header,
+                                                      UiIconId::Back, UiIconId::Exit};
     const int active = TargetPage() ? TargetPage()->sidebarItem : -1;
     for (int i = 0; i < SidebarCount; ++i)
     {
+        if (!SidebarVisible(i))
+            continue;
         const float y = SidebarItemY(i);
         const float h = SidebarItemHeight(i) - 4.0f;
         const bool enabled = SidebarEnabled(i);
@@ -937,6 +1026,9 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
             ui.DrawText(m_resources.captionFont, shown, 27.0f, TextY(ui, m_resources.captionFont, y + 15.0f), 1.0f,
                         kMenuDimTextColor);
         }
+        if (i == m_confirmItem)
+            ui.DrawText(m_resources.captionFont, "Press again", 27.0f, TextY(ui, m_resources.captionFont, y + 15.0f), 1.0f,
+                        kMenuSelectionColor);
         if (i == SidebarAbout && m_updater.UpdateAvailable())
             ui.DrawText(m_resources.captionFont, "Update available", 27.0f, TextY(ui, m_resources.captionFont, y + 15.0f), 1.0f,
                         kMenuSelectionColor);
@@ -1039,19 +1131,23 @@ void AppMenu::UpdateNotice(float deltaSeconds)
 {
     if (!m_ui)
         return;
+    // (one of the app's own showing gives way to the next at once - "Saved to slot 3" after "Slot 3")
+    if (m_notice.active && m_notice.replaceable && !m_appNotices.empty())
+    {
+        m_notice.active = false;
+        m_noticeQuickIn = true;
+    }
     if (!m_notice.active)
     {
         Achievements::Notice notice;
-        if (m_updateNoticePending)
+        if (!m_appNotices.empty())
         {
-            // A newer VBoy Color (the check at start found it).
-            m_updateNoticePending = false;
-            notice.caption = "Update available";
-            notice.title = "VBoy Color " + m_updater.LatestName() + " is out";
-            notice.text = "About > Update installs it";
-            notice.seconds = 7.0f;
-            m_notice.icon = UiIconId::Load;
+            // The app's own (a newer VBoy Color, a screenshot saved...).
+            notice = std::move(m_appNotices.front().notice);
+            m_notice.icon = m_appNotices.front().icon;
             m_notice.overMenu = true;
+            m_notice.replaceable = m_appNotices.front().replaceable;
+            m_appNotices.pop_front();
         }
         else if (!m_resources.emulator || !m_resources.emulator->GetAchievements().TakeNotice(notice))
             return;
@@ -1059,10 +1155,12 @@ void AppMenu::UpdateNotice(float deltaSeconds)
         {
             m_notice.icon = UiIconId::None;
             m_notice.overMenu = false;
+            m_notice.replaceable = false;
         }
         m_notice.active = true;
         m_notice.notice = std::move(notice);
-        m_notice.age = 0.0f;
+        m_notice.age = m_noticeQuickIn ? 0.25f : 0.0f; // (replacing one: no slide in again)
+        m_noticeQuickIn = false;
         // (glyphs baked now, outside any frame)
         m_ui->EnsureGlyphsForText(m_resources.captionBoldFont, m_notice.notice.caption);
         m_ui->EnsureGlyphsForText(m_resources.bodyBoldFont, m_notice.notice.title + "\xE2\x80\xA6");
@@ -1140,6 +1238,129 @@ void AppMenu::DrawNotice(UiRenderer &ui, float x, float y, float squeezeX, float
                            8.0f * m_menuScale * std::min(squeezeX, squeezeY));
     ui.DrawImageRounded(m_noticeTexture, nx, ny, w * squeezeX, h * squeezeY, 8.0f * m_menuScale * std::min(squeezeX, squeezeY),
                         alpha);
+}
+
+// -----------------------------------------------------------------------
+// Hotkeys (the window app - Settings > Hotkeys)
+
+bool AppMenu::HotkeyFor(int key, int mods, HotkeyAction &action) const
+{
+    const AppSettings *settings = m_resources.settings;
+    if (!settings || !settings->hotkeysSet || key < 0 || IsModifierKey(key) || WantsText())
+        return false;
+    if (m_open && TargetPage() && TargetPage()->Capturing())
+        return false; // (a key being bound)
+    // The painting tools have their keys to themselves while they're on
+    // (Shift+F10 and Shift+F4 are theirs too).
+    if (settings->paintingTools && IsPaintingToolKey(key) && (mods & ~kHotkeyShift) == 0)
+        return false;
+    for (int i = 0; i < kHotkeyActionCount; ++i)
+        if (settings->hotkeys[i].key == key && settings->hotkeys[i].mods == mods)
+        {
+            action = static_cast<HotkeyAction>(i);
+            return true;
+        }
+    return false;
+}
+
+bool AppMenu::RunHotkeyAction(HotkeyAction action)
+{
+    Emulator *emulator = m_resources.emulator;
+    const bool game = emulator && emulator->HasGame();
+    const std::string gameName = game ? WithoutRegion(emulator->RomName()) : "";
+    const int slot = m_saveStatesPage.Slot();
+    switch (action)
+    {
+    case HotkeyAction::Screenshot:
+        TakeScreenshot();
+        return true;
+    case HotkeyAction::SaveState:
+        if (game)
+        {
+            const bool saved = emulator->SaveState(slot);
+            m_saveStatesPage.RefreshSavePreview();
+            ShowNotice("Save state", saved ? "Saved to slot " + std::to_string(slot) : "Couldn't save to slot " + std::to_string(slot),
+                       gameName, UiIconId::Save);
+        }
+        return true;
+    case HotkeyAction::LoadState:
+        if (game)
+        {
+            if (!emulator->SaveStateExists(slot))
+                ShowNotice("Save state", "Slot " + std::to_string(slot) + " is empty", gameName, UiIconId::Load);
+            else if (emulator->LoadState(slot))
+            {
+                Hide();
+                ShowNotice("Save state", "Loaded slot " + std::to_string(slot), gameName, UiIconId::Load);
+            }
+            else
+                ShowNotice("Save state", "Couldn't load slot " + std::to_string(slot), gameName, UiIconId::Load);
+        }
+        return true;
+    case HotkeyAction::PreviousSlot:
+    case HotkeyAction::NextSlot:
+    {
+        m_saveStatesPage.ChangeSaveSlot(action == HotkeyAction::NextSlot ? 1 : -1);
+        const int now = m_saveStatesPage.Slot();
+        ShowNotice("Save state", "Slot " + std::to_string(now),
+                   !game ? "" : emulator->SaveStateExists(now) ? "Saved - Load state loads it" : "Empty",
+                   UiIconId::SaveSlot, 1.5f);
+        return true;
+    }
+    case HotkeyAction::Reset:
+        if (game && emulator->ResetGame())
+        {
+            Hide();
+            ShowNotice("Reset", gameName, "From the start", UiIconId::Reset, 1.5f);
+        }
+        return true;
+    case HotkeyAction::CloseGame:
+        if (game)
+            CloseGame();
+        return true;
+    case HotkeyAction::Quit:
+        Quit();
+        return true;
+    case HotkeyAction::Menu:
+    case HotkeyAction::Fullscreen:
+        break;
+    }
+    return false;
+}
+
+void AppMenu::SubmitRawKey(int key, int mods)
+{
+    if (m_open && !m_sidebarFocus && m_transitionState <= 0.0f && m_currentPage == &m_hotkeysPage)
+        m_hotkeysPage.SubmitKey(key, mods);
+}
+
+void AppMenu::TakeScreenshot()
+{
+    Emulator *emulator = m_resources.emulator;
+    if (!emulator || !emulator->HasGame())
+        return;
+    const AppSettings *settings = m_resources.settings;
+    const std::string name = emulator->SaveScreenshot(settings ? settings->ScreenTint() : XrColor4f{1.0f, 1.0f, 1.0f, 1.0f},
+                                                      settings ? settings->ScreenPattern() : -1);
+    if (name.empty())
+        ShowNotice("Screenshot", "Couldn't save it", "Settings > Folders > Screenshots: can it be written?",
+                   UiIconId::FlatScreen, 3.5f);
+    else
+        ShowNotice("Screenshot", "Saved", name, UiIconId::FlatScreen);
+}
+
+void AppMenu::ShowNotice(const std::string &caption, const std::string &title, const std::string &text, UiIconId icon,
+                         float seconds)
+{
+    Achievements::Notice notice;
+    notice.caption = caption;
+    notice.title = title;
+    notice.text = text;
+    notice.seconds = seconds;
+    // (only the newest of these waits - pressing a key again replaces it)
+    m_appNotices.erase(std::remove_if(m_appNotices.begin(), m_appNotices.end(), [](const AppNotice &n) { return n.replaceable; }),
+                       m_appNotices.end());
+    m_appNotices.push_back({std::move(notice), icon == UiIconId::None ? UiIconId::Header : icon, true});
 }
 
 // -----------------------------------------------------------------------

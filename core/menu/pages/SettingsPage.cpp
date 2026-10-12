@@ -123,6 +123,11 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                        { if (*edit) (*edit)(""); }, nullptr, nullptr, UiIconId::Move)
             ->SetValue("Edit");
     }
+    // The window app's hotkeys (and the painting tools' keys).
+    if (resources.buttonMappingProfile == ButtonMappingProfile::Desktop)
+        list->AddEntry("Hotkeys", [this](MenuItem *)
+                       { if (hotkeysPage) Navigate(hotkeysPage, 1); }, nullptr, nullptr, UiIconId::Mapping)
+            ->opensPage = true;
     // (a flat window or phone has no screen to place)
     if (resources.buttonMappingProfile == ButtonMappingProfile::Vr)
         list->AddEntry("Adjust screen", [this](MenuItem *)
@@ -211,7 +216,7 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                                                     folderPage->Open(kind);
                                                     Navigate(folderPage, 1);
                                                 },
-                                                nullptr, nullptr, i == 0 ? UiIconId::RomList : i == 1 ? UiIconId::Save : i == 2 ? UiIconId::SaveSlot : UiIconId::Settings);
+                                                nullptr, nullptr, i == 0 ? UiIconId::RomList : i == 1 ? UiIconId::Save : i == 2 ? UiIconId::SaveSlot : i == 3 ? UiIconId::Settings : UiIconId::FlatScreen);
             m_folderEntries[i]->opensPage = true;
         }
     }

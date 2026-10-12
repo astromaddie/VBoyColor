@@ -66,6 +66,10 @@ public:
     // saved and shut down).
     void Relaunch() const;
     void OpenUrl(const std::string &url) override;
+    // Quit (the sidebar, a hotkey): the main loop ends as on closing the window.
+    bool CanQuit() const override { return true; }
+    void RequestQuit() override { m_quit = true; }
+    bool QuitRequested() const override { return m_quit; }
 
     // The clipboard: GLFW's (Windows, X11, Wayland), hooked up by both desktop
     // apps' main once GLFW is initialized - none until then, or if GLFW
@@ -93,6 +97,7 @@ private:
     std::string m_appFolder;                 // the exe's (UTF-8)
     std::string m_exePath;                   // the running exe (UTF-8)
     bool m_restart = false;
+    bool m_quit = false;
     std::string m_folders[kDataKindCount];   // chosen ones, "" = default
     struct Download;
     std::shared_ptr<Download> m_download[2]; // per slot (shared with its thread)

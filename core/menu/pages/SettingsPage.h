@@ -25,6 +25,7 @@ public:
     EmulatorButtonMapPage *emulatorButtonMapPage = nullptr;
     MenuPage *moveScreenPage = nullptr;
     FolderPage *folderPage = nullptr;
+    MenuPage *hotkeysPage = nullptr; // (the window app only)
 
     void Init(UiRenderer &ui, const UiMenuResources &resources) override;
     void OnShow() override;

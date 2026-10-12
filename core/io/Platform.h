@@ -142,6 +142,14 @@ public:
     // Opens a web page in the system's browser.
     virtual void OpenUrl(const std::string & /*url*/) {}
 
+    // ---- Quit (the menu's sidebar, a hotkey): where the app can close
+    // itself - the PC apps and a phone or TV (not a headset: its own menu
+    // closes apps). The main loop ends once QuitRequested, and cleans up as
+    // on any close. ----
+    virtual bool CanQuit() const { return false; }
+    virtual void RequestQuit() {}
+    virtual bool QuitRequested() const { return false; }
+
     // ---- The system clipboard (text): the text fields' Copy and Paste
     // (menu/pages/TextInputPage.h). ----
     virtual bool HasClipboard() const { return false; }

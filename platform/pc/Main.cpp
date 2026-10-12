@@ -71,7 +71,7 @@ int main()
 
     bool requestRestart = false;
     int exitCode = 0;
-    while (!quitRequested && !platform.RestartRequested())
+    while (!quitRequested && !platform.RestartRequested() && !platform.QuitRequested())
     {
         try
         {

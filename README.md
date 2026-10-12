@@ -130,18 +130,28 @@ pack).*
   Quest it installs when the app next starts). A beta looks for betas too,
   a full release only for full releases.
 - **Your own folders** - Settings → Folders: choose where your games,
-  saved games, save states and settings go (a synced folder, say). On PC
+  saved games, save states, settings and screenshots go (a synced folder,
+  say). On PC
   you pick them right in the menu, with the mouse, a gamepad or in VR; on
   Android with the system's folder picker (on the Quest, when the app next
   starts). The files already there are copied over - newer ones win, the
   one replaced is kept as `.bak`, and the originals stay where they were.
-- **Video recording** (PC) - F12 records the original red and the colored
-  version side by side, frame for frame, for comparison videos (F12 again
-  to stop; it stops on its own after ten minutes).
+- **Screenshots** - Save states → Screenshot (or F12 on PC) saves the
+  game's picture, in its colors, as a PNG in the games folder's
+  `screenshots` (Settings → Folders → Screenshots picks another).
+- **Hotkeys** (PC) - Settings → Controls → Hotkeys: a key, or a key with
+  Ctrl / Alt / Shift (Alt+F1, say), for the menu, fullscreen, screenshots,
+  saving and loading a state, the save slot, reset, closing the game and
+  quitting.
+- **Video recording** (PC) - with Settings → Hotkeys → Color pack and video
+  tools on, F12 records the original red and the colored version side by
+  side, frame for frame, for comparison videos (F12 again to stop; it stops
+  on its own after ten minutes).
 - **Tool-assisted runs** (PC) - drop a Virtual Boy run from
   [TASVideos](https://tasvideos.org/Movies-VBoy) (a `.bk2` file) on the
   window, or open it with `VBoyColor.exe`: its game (from your `roms`
-  folder) plays the whole run by itself, in color - press F12 to record it.
+  folder) plays the whole run by itself, in color - F12 records it (with
+  the video tools on, as above).
   Your own save stays untouched; when the run ends, you take over.
 
 ## Getting started
@@ -245,7 +255,12 @@ The gamepad column is the PC window's and the phone's. With a gamepad in VR
 Everything can be remapped in Settings → Button mapping - and per game:
 hold a game's card in the library (a finger or a Quest laser held still on
 it; right-click with a mouse) for its own button mapping and, on a phone,
-its own touch controls. On PC, **Alt+Enter** toggles fullscreen.
+its own touch controls. On PC, **Alt+Enter** toggles fullscreen, and the
+other keys are in Settings → Controls → Hotkeys: by default F2 saves a
+state, F4 loads it, F6 / F7 pick the slot, F12 takes a screenshot, Ctrl+R
+resets and Ctrl+Q quits. **Close game** (while one is running) and **Quit**
+(on PC, and on Android phones and TVs) are at the bottom of the menu's
+sidebar - press twice.
 
 ## Building
 

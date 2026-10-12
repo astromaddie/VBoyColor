@@ -300,6 +300,7 @@ add_library(vbgo_app STATIC
     core/emu/TasMovie.cpp
     core/input/XrInput.cpp
     core/input/ButtonMapping.cpp
+    core/input/Hotkeys.cpp
     core/io/Settings.cpp
     core/io/GameControls.cpp
     core/io/DataFolders.cpp
@@ -308,6 +309,7 @@ add_library(vbgo_app STATIC
     core/achievements/Achievements.cpp
     core/menu/pages/AchievementsPage.cpp
     core/menu/pages/TextInputPage.cpp
+    core/menu/pages/HotkeysPage.cpp
 )
 target_include_directories(vbgo_app PUBLIC core ${CMAKE_SOURCE_DIR}/third_party ${CMAKE_SOURCE_DIR}/platform)
 target_link_libraries(vbgo_app PUBLIC openxr_loader volk freetype vb_core rcheevos)

@@ -15,10 +15,13 @@
 #include "menu/pages/AboutPage.h"
 #include "menu/pages/AchievementsPage.h"
 #include "menu/pages/TextInputPage.h"
+#include "menu/pages/HotkeysPage.h"
+#include "input/Hotkeys.h"
 #include "achievements/Achievements.h"
 #include "gfx/UiRenderer.h"
 
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <vector>
 
@@ -27,7 +30,8 @@ struct AppSettings;
 class Platform;
 
 // Top-level menu system: a sidebar on the left (the VBoy Color logo, the
-// pages - Library, Resume, Save states, Settings, About - and the clock)
+// pages - Library, Resume, Save states, Settings, About - then Close game and
+// Quit where they apply, and the clock)
 // and the current page right of it, with the button hints along the bottom.
 // The focus is either in the sidebar (Up/Down pick a page, which shows
 // right away; A/Right go into it) or in the page (Left at its edge, or B,
@@ -56,6 +60,8 @@ public:
         SidebarAchievements,
         SidebarSettings,
         SidebarAbout,
+        SidebarCloseGame, // (while a game runs: back to the library, nothing running)
+        SidebarQuit,      // (where the app can close itself - Platform::CanQuit)
         SidebarCount
     };
 
@@ -173,6 +179,25 @@ public:
     void TypePaste();
     void TypeCopy();
 
+    // The window app's hotkeys (Settings > Hotkeys): the action a key press
+    // (with Ctrl / Alt / Shift, kHotkey*) runs, if any - HotkeyAction::Menu and
+    // ::Fullscreen are the platform's own (it toggles the menu, the window),
+    // the rest RunHotkeyAction does. While a key is being bound (or text
+    // typed) there's none.
+    bool HotkeyFor(int key, int mods, HotkeyAction &action) const;
+    // Save state, Load state, the slot, Screenshot, Reset, Close game, Quit -
+    // with a notice saying what happened. False for one it doesn't do.
+    bool RunHotkeyAction(HotkeyAction action);
+    // A key pressed with these modifiers (the window app, every key) - for
+    // Settings > Hotkeys while it's waiting for one.
+    void SubmitRawKey(int key, int mods);
+    // The game's picture to the screenshots folder, and a notice saying so.
+    void TakeScreenshot();
+    // A notice of the app's own ("Screenshot saved"), over the game or the
+    // menu - one showing already is replaced (an achievement's waits).
+    void ShowNotice(const std::string &caption, const std::string &title, const std::string &text, UiIconId icon,
+                    float seconds = 2.5f);
+
 private:
     class Sidebar;
     struct Logo
@@ -193,6 +218,10 @@ private:
     MenuPage *TargetPage() const { return m_nextPage ? m_nextPage : m_currentPage; }
     MenuPage *PageFor(int item);
     bool SidebarEnabled(int item) const;
+    // Close game and Quit aren't there at all where they don't apply.
+    bool SidebarVisible(int item) const;
+    void CloseGame();
+    void Quit();
     void MoveSidebar(int dir);
     void ActivateSidebar(bool pressedA);
     void FocusSidebar();
@@ -224,6 +253,7 @@ private:
     AboutPage m_aboutPage;
     AchievementsPage m_achievementsPage;
     TextInputPage m_textInputPage;
+    HotkeysPage m_hotkeysPage;
     GameControls m_gameControls;
 
     ThumbnailLibrary m_thumbnails;
@@ -246,6 +276,10 @@ private:
     Menu m_sidebarMenu;
     bool m_sidebarFocus = false;
     int m_sidebarCursor = SidebarLibrary;
+    // Close game / Quit: the first press asks ("Press again"), a second one
+    // within a few seconds does it - moving away forgets it.
+    int m_confirmItem = -1;
+    float m_confirmSeconds = 0.0f;
 
     // The pointer (see SetPointer).
     struct Pointer
@@ -286,9 +320,19 @@ private:
         // achievement's waits for the game.
         UiIconId icon = UiIconId::None;
         bool overMenu = false;
+        bool replaceable = false; // (see AppNotice)
     } m_notice;
     // A newer VBoy Color turned up on the check at start: tell once.
-    bool m_updateNoticePending = false, m_updateNoticeShown = false;
+    bool m_updateNoticeShown = false;
+    // Notices of the app's own waiting to show (ShowNotice).
+    struct AppNotice
+    {
+        Achievements::Notice notice;
+        UiIconId icon;
+        bool replaceable = true; // (a key's - the next press's replaces it; not the update's)
+    };
+    std::deque<AppNotice> m_appNotices;
+    bool m_noticeQuickIn = false; // (one replaced another: shown without sliding in again)
     UiImageHandle m_noticeTexture;
     float m_menuScale = kMenuScale; // see SetMenuScale
     std::string m_versionLine1, m_versionLine2;

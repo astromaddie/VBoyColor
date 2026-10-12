@@ -624,11 +624,11 @@ int main(int argc, char **argv)
         // Emulator::ToggleRecording).
         bool f5WasPressed = false;
         bool f9WasPressed = false, f10WasPressed = false, f8WasPressed = false, f11WasPressed = false,
-             f7WasPressed = false, f6WasPressed = false, f12WasPressed = false, fullscreenWasPressed = false;
+             f7WasPressed = false, f6WasPressed = false, f12WasPressed = false;
         bool keyboardWasDown[GLFW_KEY_LAST + 1]{};
 
         // (an update in place: out, as on closing, then start again - see the end)
-        while (!glfwWindowShouldClose(window) && !platform.RestartRequested())
+        while (!glfwWindowShouldClose(window) && !platform.RestartRequested() && !platform.QuitRequested())
         {
             glfwPollEvents();
 
@@ -683,20 +683,49 @@ int main(int argc, char **argv)
             }
 
             const bool altDown = glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS;
-            const bool fullscreenPressed = altDown && glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
-            if (fullscreenPressed && !fullscreenWasPressed)
-                ToggleFullscreen(window);
-            fullscreenWasPressed = fullscreenPressed;
+            const bool ctrlDown = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+                                  glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+            const bool shiftDown = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                                   glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+            const int keyMods = (ctrlDown ? kHotkeyCtrl : 0) | (altDown ? kHotkeyAlt : 0) | (shiftDown ? kHotkeyShift : 0);
+            // The keys pressed this frame (for the hotkeys, and binding keys in the menu - below).
+            std::vector<int> pressedKeys;
+            for (int key = GLFW_KEY_SPACE; key <= GLFW_KEY_LAST; ++key)
+            {
+                const bool down = glfwGetKey(window, key) == GLFW_PRESS;
+                if (down && !keyboardWasDown[key])
+                    pressedKeys.push_back(key);
+                keyboardWasDown[key] = down;
+            }
+
+            // The hotkeys (Settings > Hotkeys): the menu (Tab), full screen
+            // (Alt+Enter), screenshots, save states...
+            for (int key : pressedKeys)
+            {
+                HotkeyAction action;
+                if (!appMenu.HotkeyFor(key, keyMods, action))
+                    continue;
+                if (action == HotkeyAction::Menu)
+                    appMenu.ToggleOpen();
+                else if (action == HotkeyAction::Fullscreen)
+                    ToggleFullscreen(window);
+                else
+                    appMenu.RunHotkeyAction(action);
+            }
 
             // (a gamepad's Guide button or Back + Start together too, as on the
             // Quest - not the left stick click, which happens while playing)
             const bool padMenu = PollDesktopGamepads().menu;
-            const bool tabPressed = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS || padMenu;
-            if (tabPressed && !tabWasPressed)
+            if (padMenu && !tabWasPressed)
                 appMenu.ToggleOpen();
-            tabWasPressed = tabPressed;
+            tabWasPressed = padMenu;
 
-            const bool f5Pressed = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
+            // The color pack tools on F4 to F12 (Settings > Hotkeys > Painting
+            // tools - off, those keys are the hotkeys'), without Ctrl or Alt.
+            const bool tools = settings.paintingTools && !ctrlDown && !altDown;
+            auto toolKey = [&](int key) { return tools && glfwGetKey(window, key) == GLFW_PRESS; };
+
+            const bool f5Pressed = toolKey(GLFW_KEY_F5);
             if (f5Pressed && !f5WasPressed)
             {
                 g_eyeView = (g_eyeView + 1) % 3;
@@ -704,9 +733,7 @@ int main(int argc, char **argv)
                 std::printf("Showing %s\n", kViews[g_eyeView]);
             }
             f5WasPressed = f5Pressed;
-            const bool f4Pressed = glfwGetKey(window, GLFW_KEY_F4) == GLFW_PRESS;
-            const bool shiftDown = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-                                   glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+            const bool f4Pressed = toolKey(GLFW_KEY_F4);
             if (f4Pressed && !f4WasPressed && shiftDown)
             {
                 // Shift+F4 (dev): the touch controls' edit mode, as the phone's.
@@ -749,14 +776,14 @@ int main(int argc, char **argv)
                 if (menuPressed && emulator.HasGame())
                     appMenu.Show();
             }
-            const bool f9Pressed = glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS;
+            const bool f9Pressed = toolKey(GLFW_KEY_F9);
             if (f9Pressed && !f9WasPressed)
             {
                 emulator.SetTileDebugView(!emulator.IsTileDebugView());
                 std::printf("Tile debug view %s\n", emulator.IsTileDebugView() ? "on" : "off");
             }
             f9WasPressed = f9Pressed;
-            const bool f10Pressed = glfwGetKey(window, GLFW_KEY_F10) == GLFW_PRESS;
+            const bool f10Pressed = toolKey(GLFW_KEY_F10);
             if (f10Pressed && !f10WasPressed)
             {
                 const bool rightEye = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
@@ -768,7 +795,7 @@ int main(int argc, char **argv)
                             captured.c_str());
             }
             f10WasPressed = f10Pressed;
-            const bool f8Pressed = glfwGetKey(window, GLFW_KEY_F8) == GLFW_PRESS;
+            const bool f8Pressed = toolKey(GLFW_KEY_F8);
             if (f8Pressed && !f8WasPressed)
             {
                 emulator.SetColorPackEnabled(!emulator.IsColorPackEnabled());
@@ -776,15 +803,15 @@ int main(int argc, char **argv)
                             emulator.HasColorPack() ? "" : " (no pack loaded for this game)");
             }
             f8WasPressed = f8Pressed;
-            const bool f11Pressed = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+            const bool f11Pressed = toolKey(GLFW_KEY_F11);
             if (f11Pressed && !f11WasPressed)
                 std::printf("%s\n", emulator.ReloadColorPack().c_str());
             f11WasPressed = f11Pressed;
-            const bool f7Pressed = glfwGetKey(window, GLFW_KEY_F7) == GLFW_PRESS;
+            const bool f7Pressed = toolKey(GLFW_KEY_F7);
             if (f7Pressed && !f7WasPressed)
                 std::printf("%s\n", emulator.SetCollectingUncolored(!emulator.IsCollectingUncolored()).c_str());
             f7WasPressed = f7Pressed;
-            const bool f6Pressed = glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS;
+            const bool f6Pressed = toolKey(GLFW_KEY_F6);
             if (f6Pressed && !f6WasPressed)
             {
                 const std::string saved = emulator.CaptureTileSheet();
@@ -793,7 +820,7 @@ int main(int argc, char **argv)
                             saved.c_str());
             }
             f6WasPressed = f6Pressed;
-            const bool f12Pressed = glfwGetKey(window, GLFW_KEY_F12) == GLFW_PRESS;
+            const bool f12Pressed = toolKey(GLFW_KEY_F12);
             if (f12Pressed && !f12WasPressed)
             {
                 if (emulator.IsRecording())
@@ -884,13 +911,12 @@ int main(int argc, char **argv)
             }
 
             // Raw key edges let the mapping page bind any GLFW keyboard key,
-            // independent of the fixed menu-navigation controls above.
-            for (int key = GLFW_KEY_SPACE; key <= GLFW_KEY_LAST; ++key)
+            // independent of the fixed menu-navigation controls above - and
+            // Settings > Hotkeys a key with its modifiers.
+            for (int key : pressedKeys)
             {
-                const bool down = glfwGetKey(window, key) == GLFW_PRESS;
-                if (down && !keyboardWasDown[key])
-                    appMenu.SubmitRawMappingInput({true, ButtonMapper::DeviceKeyboard, key});
-                keyboardWasDown[key] = down;
+                appMenu.SubmitRawMappingInput({true, ButtonMapper::DeviceKeyboard, key});
+                appMenu.SubmitRawKey(key, keyMods);
             }
 
             // Even while paused - a palette change from the menu re-colors

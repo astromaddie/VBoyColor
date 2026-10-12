@@ -395,6 +395,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
 {
     PhoneState state;
     app->userData = &state;
+    platform.SetCanQuit(true); // (the menu's Quit - a TV with a gamepad has no other way out)
     app->onAppCmd = HandleAppCmd;
     app->onInputEvent = HandleInputEvent;
     // (no dimming while playing with a gamepad)

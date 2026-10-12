@@ -145,8 +145,9 @@ bool AndroidPlatform::WriteRomsFile(const std::string &fileName, bool inStatesDi
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID openMethod = env->GetMethodID(activityClass, "openDataFileForWrite", "(ILjava/lang/String;)I");
-    jstring nameJString = env->NewStringUTF(fileName.c_str());
-    const jint fd = env->CallIntMethod(m_activity, openMethod, static_cast<jint>(DataKindOf(fileName, inStatesDir)), nameJString);
+    const DataKind kind = DataKindOf(fileName, inStatesDir);
+    jstring nameJString = env->NewStringUTF(NameInFolder(fileName, kind).c_str());
+    const jint fd = env->CallIntMethod(m_activity, openMethod, static_cast<jint>(kind), nameJString);
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(nameJString);
 
@@ -170,8 +171,9 @@ std::vector<uint8_t> AndroidPlatform::ReadRomsFile(const std::string &fileName, 
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID openMethod = env->GetMethodID(activityClass, "openDataFileForRead", "(ILjava/lang/String;)I");
-    jstring nameJString = env->NewStringUTF(fileName.c_str());
-    const jint fd = env->CallIntMethod(m_activity, openMethod, static_cast<jint>(DataKindOf(fileName, inStatesDir)), nameJString);
+    const DataKind kind = DataKindOf(fileName, inStatesDir);
+    jstring nameJString = env->NewStringUTF(NameInFolder(fileName, kind).c_str());
+    const jint fd = env->CallIntMethod(m_activity, openMethod, static_cast<jint>(kind), nameJString);
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(nameJString);
 
@@ -184,8 +186,9 @@ bool AndroidPlatform::RomsFileExists(const std::string &fileName, bool inStatesD
 
     jclass activityClass = env->GetObjectClass(m_activity);
     jmethodID existsMethod = env->GetMethodID(activityClass, "dataFileExists", "(ILjava/lang/String;)Z");
-    jstring nameJString = env->NewStringUTF(fileName.c_str());
-    const bool exists = env->CallBooleanMethod(m_activity, existsMethod, static_cast<jint>(DataKindOf(fileName, inStatesDir)), nameJString);
+    const DataKind kind = DataKindOf(fileName, inStatesDir);
+    jstring nameJString = env->NewStringUTF(NameInFolder(fileName, kind).c_str());
+    const bool exists = env->CallBooleanMethod(m_activity, existsMethod, static_cast<jint>(kind), nameJString);
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(nameJString);
     return exists;
@@ -218,6 +221,18 @@ std::string AndroidPlatform::SetDataFolder(DataKind kind, const std::string &pat
 {
     // (only back to the default place - other folders come from the picker)
     return path.empty() ? CallKindString("resetFolder", kind) : "";
+}
+
+void AndroidPlatform::RequestQuit()
+{
+    // (Activity.finish posts the close - the main loop sees destroyRequested)
+    JNIEnv *env = Env();
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID finish = env->GetMethodID(activityClass, "finish", "()V");
+    env->DeleteLocalRef(activityClass);
+    if (finish)
+        env->CallVoidMethod(m_activity, finish);
+    m_quit = true;
 }
 
 std::string AndroidPlatform::PickDataFolder(DataKind kind)

@@ -131,7 +131,7 @@ void FolderPage::Rebuild()
 
     const std::string label = m_platform->DataFolderLabel(m_kind);
     const bool custom = m_kind == DataKind::Games ? false : !label.empty();
-    const char *defaultPlace = m_kind == DataKind::Games ? "" : (m_kind == DataKind::Saves ? "In the games folder" : "In the games folder's States");
+    const char *defaultPlace = m_kind == DataKind::Games ? "" : DefaultPlaceName(m_kind);
 
     m_list->AddHeader("Now");
     auto now = m_list->AddEntry(custom || m_kind == DataKind::Games ? Shorten(label, 52) : defaultPlace, nullptr, nullptr, nullptr,
@@ -150,7 +150,7 @@ void FolderPage::Rebuild()
                          },
                          nullptr, nullptr, UiIconId::Load);
         if (custom)
-            m_list->AddEntry(m_kind == DataKind::Saves ? "Back in the games folder" : "Back in the games folder's States",
+            m_list->AddEntry(BackToDefaultName(m_kind),
                              [this](MenuItem *) { Choose(""); }, nullptr, nullptr, UiIconId::Reset);
     }
     else
@@ -159,7 +159,7 @@ void FolderPage::Rebuild()
         m_list->AddEntry("Use this folder", [this](MenuItem *) { Choose(m_browsePath); }, nullptr, nullptr, UiIconId::Save)
             ->SetValue(Shorten(LastPart(m_browsePath), 24));
         if (custom)
-            m_list->AddEntry(m_kind == DataKind::Saves ? "Back in the games folder" : "Back in the games folder's States",
+            m_list->AddEntry(BackToDefaultName(m_kind),
                              [this](MenuItem *) { Choose(""); }, nullptr, nullptr, UiIconId::Reset);
         else if (m_kind == DataKind::Games && !label.empty() && label != "roms")
             m_list->AddEntry("Back to roms, next to VBoy Color", [this](MenuItem *) { Choose(""); }, nullptr, nullptr,

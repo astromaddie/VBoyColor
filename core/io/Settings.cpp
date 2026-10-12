@@ -19,7 +19,7 @@ namespace
     // user had set up (button mapping, screen placement, palette) and leaves
     // the newer fields at their defaults. 18 has 17's layout (only the
     // screen look's default changed); 19 appended screen3D, 20 checkForUpdates,
-    // 21 gamepadByPosition.
+    // 21 gamepadByPosition, 22 the hotkeys and paintingTools.
     size_t PrefixCompatibleSize(int version)
     {
         switch (version)
@@ -43,6 +43,8 @@ namespace
             return offsetof(AppSettings, checkForUpdates);
         case 20:
             return offsetof(AppSettings, gamepadByPosition);
+        case 21:
+            return offsetof(AppSettings, paintingTools);
         default:
             return 0;
         }

@@ -50,10 +50,12 @@ public class MainActivity extends NativeActivity {
     private static final int REQUEST_PICK_ROMS_FOLDER = 1001;
     // Settings > Folders (core/io/DataFolders.h): a folder per kind of file -
     // 0 games (the ROMs folder above), 1 saved games, 2 save states,
-    // 3 settings. Unset = the default place inside the games folder (the
-    // root for saved games, its "States" subfolder for the other two).
-    private static final int KIND_GAMES = 0, KIND_SAVES = 1, KIND_STATES = 2, KIND_SETTINGS = 3;
-    private static final String PREF_FOLDER_URI = "folder_uri_"; // + kind (1-3)
+    // 3 settings, 4 screenshots. Unset = the default place inside the games
+    // folder (the root for saved games, its "States" subfolder for save
+    // states and settings, "screenshots" for screenshots).
+    private static final int KIND_GAMES = 0, KIND_SAVES = 1, KIND_STATES = 2, KIND_SETTINGS = 3, KIND_SCREENSHOTS = 4;
+    private static final int KIND_COUNT = 5;
+    private static final String PREF_FOLDER_URI = "folder_uri_"; // + kind (1-4)
     // A folder to pick when the app next starts (a headset can't show the
     // picker mid-session - see requestPickRomsFolder).
     private static final String PREF_PICK_PENDING = "pick_pending";
@@ -82,7 +84,7 @@ public class MainActivity extends NativeActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode >= REQUEST_PICK_FOLDER && requestCode < REQUEST_PICK_FOLDER + 4) {
+        if (requestCode >= REQUEST_PICK_FOLDER && requestCode < REQUEST_PICK_FOLDER + KIND_COUNT) {
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
                 folderPicked(requestCode - REQUEST_PICK_FOLDER, data.getData());
             }
@@ -271,18 +273,24 @@ public class MainActivity extends NativeActivity {
     // documentId of the ROMs folder's "States" subfolder, creating it if it
     // doesn't exist yet. null on failure.
     private String getOrCreateStatesDirDocumentId(Uri treeUri) {
+        return getOrCreateSubfolderDocumentId(treeUri, "States");
+    }
+
+    // documentId of the ROMs folder's subfolder name, creating it if it
+    // doesn't exist yet. null on failure.
+    private String getOrCreateSubfolderDocumentId(Uri treeUri, String name) {
         String rootDocId = DocumentsContract.getTreeDocumentId(treeUri);
-        String existing = findChildDocumentId(treeUri, rootDocId, "States");
+        String existing = findChildDocumentId(treeUri, rootDocId, name);
         if (existing != null) {
             return existing;
         }
         try {
             Uri parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId);
             Uri createdUri = DocumentsContract.createDocument(getContentResolver(), parentUri,
-                    DocumentsContract.Document.MIME_TYPE_DIR, "States");
+                    DocumentsContract.Document.MIME_TYPE_DIR, name);
             return createdUri != null ? DocumentsContract.getDocumentId(createdUri) : null;
         } catch (Exception e) {
-            Log.e(TAG, "getOrCreateStatesDirDocumentId failed", e);
+            Log.e(TAG, "getOrCreateSubfolderDocumentId failed: " + name, e);
             return null;
         }
     }
@@ -304,6 +312,11 @@ public class MainActivity extends NativeActivity {
         Uri tree = Uri.parse(games);
         if (kind == KIND_GAMES || kind == KIND_SAVES) {
             return new Object[]{tree, DocumentsContract.getTreeDocumentId(tree)};
+        }
+        if (kind == KIND_SCREENSHOTS) {
+            String shots = createIfMissing ? getOrCreateSubfolderDocumentId(tree, "screenshots")
+                    : findChildDocumentId(tree, DocumentsContract.getTreeDocumentId(tree), "screenshots");
+            return shots == null ? null : new Object[]{tree, shots};
         }
         String states = createIfMissing ? getOrCreateStatesDirDocumentId(tree)
                 : findChildDocumentId(tree, DocumentsContract.getTreeDocumentId(tree), "States");
@@ -329,7 +342,8 @@ public class MainActivity extends NativeActivity {
                 fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, fileDocId);
             } else {
                 Uri parentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocId);
-                fileUri = DocumentsContract.createDocument(getContentResolver(), parentUri, "application/octet-stream", fileName);
+                String mime = fileName.toLowerCase().endsWith(".png") ? "image/png" : "application/octet-stream";
+                fileUri = DocumentsContract.createDocument(getContentResolver(), parentUri, mime, fileName);
                 if (fileUri == null) {
                     return -1;
                 }
@@ -503,7 +517,7 @@ public class MainActivity extends NativeActivity {
         }).start();
     }
 
-    // Back to the default place (kinds 1-3), copying the kind's files there.
+    // Back to the default place (kinds 1-4), copying the kind's files there.
     public String resetFolder(final int kind) {
         if (kind == KIND_GAMES || getFolderUriString(kind) == null) {
             return "";
@@ -523,8 +537,8 @@ public class MainActivity extends NativeActivity {
     private void changeFolder(int kind, String newTree) {
         synchronized (folderLock) {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            Object[][] before = new Object[4][];
-            for (int k = 0; k < 4; k++) {
+            Object[][] before = new Object[KIND_COUNT][];
+            for (int k = 0; k < KIND_COUNT; k++) {
                 before[k] = locate(k, false);
             }
             String oldTree = kind == KIND_GAMES ? getRomsTreeUriString() : getFolderUriString(kind);
@@ -537,9 +551,12 @@ public class MainActivity extends NativeActivity {
             }
             edit.commit();
             int copied = 0;
-            for (int k = 1; k < 4; k++) {
+            for (int k = 1; k < KIND_COUNT; k++) {
                 if (k != kind && kind != KIND_GAMES) {
                     continue;
+                }
+                if (k == KIND_SCREENSHOTS) {
+                    continue; // (screenshots stay where they were taken - new ones go to the new place)
                 }
                 if (kind == KIND_GAMES && getFolderUriString(k) != null) {
                     continue; // (has a folder of its own)
@@ -553,7 +570,7 @@ public class MainActivity extends NativeActivity {
             // The old folder's permission, if nothing else uses it.
             if (oldTree != null && !oldTree.equals(newTree)) {
                 boolean used = oldTree.equals(getRomsTreeUriString());
-                for (int k = 1; k < 4; k++) {
+                for (int k = 1; k < KIND_COUNT; k++) {
                     used |= oldTree.equals(getFolderUriString(k));
                 }
                 if (!used) {
@@ -565,7 +582,7 @@ public class MainActivity extends NativeActivity {
                     }
                 }
             }
-            String[] names = {"Games", "Saved games", "Save states", "Settings"};
+            String[] names = {"Games", "Saved games", "Save states", "Settings", "Screenshots"};
             folderStatus = copied > 0 ? names[kind] + ": copied " + copied + (copied == 1 ? " file" : " files") + " - the originals stay"
                     : names[kind] + " folder changed";
         }

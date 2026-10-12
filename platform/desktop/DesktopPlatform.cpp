@@ -70,7 +70,7 @@ namespace
     }
 
     constexpr const char *kFoldersFile = "folders.txt";
-    constexpr const char *kFolderKeys[kDataKindCount] = {"games", "saves", "states", "settings"};
+    constexpr const char *kFolderKeys[kDataKindCount] = {"games", "saves", "states", "settings", "screenshots"};
 } // namespace
 
 DesktopPlatform::DesktopPlatform(const char *settingsFileName) : m_settingsFileName(settingsFileName)
@@ -165,7 +165,8 @@ std::string DesktopPlatform::FolderOf(DataKind kind) const
 
 std::string DesktopPlatform::PathFor(const std::string &fileName, bool inStatesDir) const
 {
-    return FolderOf(DataKindOf(fileName, inStatesDir)) + "/" + fileName;
+    const DataKind kind = DataKindOf(fileName, inStatesDir);
+    return FolderOf(kind) + "/" + NameInFolder(fileName, kind);
 }
 
 bool DesktopPlatform::WriteRomsFile(const std::string &fileName, bool inStatesDir, const void *data, size_t size)
@@ -334,7 +335,9 @@ namespace
             if (!it->is_regular_file(fileEc))
                 continue;
             const std::string name = ToU8(it->path().filename());
-            if (DataKindOf(name, inStatesDir) != kind)
+            // (a screenshots folder holds nothing but them: its pictures)
+            const bool png = name.size() > 4 && name.compare(name.size() - 4, 4, ".png") == 0;
+            if (kind == DataKind::Screenshots ? !png : DataKindOf(name, inStatesDir) != kind)
                 continue;
             const std::filesystem::path target = to / it->path().filename();
             if (std::filesystem::exists(target, fileEc))
@@ -412,6 +415,8 @@ std::string DesktopPlatform::SetDataFolder(DataKind kind, const std::string &pat
     {
         if (i != k && kind != DataKind::Games)
             continue;
+        if (static_cast<DataKind>(i) == DataKind::Screenshots && i != k)
+            continue; // (screenshots stay where they were taken - new ones go to the new place)
         if (before[i] == after[i])
             continue;
         const int n = CopyKind(absolute(before[i]), absolute(after[i]), static_cast<DataKind>(i));

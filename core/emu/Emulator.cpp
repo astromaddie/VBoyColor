@@ -1,6 +1,7 @@
 #include "emu/Emulator.h"
 #include "emu/ThumbnailRecipes.h"
 #include "emu/vbgo_tiletrack.h"
+#include "io/DataFolders.h"
 #include "io/Settings.h"
 
 #include <libretro.h>
@@ -18,6 +19,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <unordered_map>
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -367,6 +369,154 @@ bool Emulator::ResetGame()
     retro_reset();
     m_achievements.GameReset();
     return true;
+}
+
+bool Emulator::CloseGame()
+{
+    std::lock_guard<std::recursive_mutex> emu(m_emuMutex);
+    BringGameBack();
+    if (!m_romLoaded)
+        return false;
+    {
+        // (no frame still due from before)
+        std::lock_guard<std::mutex> lock(m_workMutex);
+        m_pendingRuns = 0;
+    }
+    if (m_recorder.Active())
+        LogLine("[Emulator] %s", ToggleRecordingLocked().c_str());
+    if (m_collecting) // (what was collected is saved as the game's sheets)
+        LogLine("[Emulator] %s", SetCollectingUncolored(false).c_str());
+    m_collector.Reset();
+    SaveRam(); // (before unloading - the core's SRAM pointer goes with the game)
+    StopMovie();
+    m_movieSession = false;
+    g_movieCore = false;
+    retro_unload_game();
+    m_romLoaded = false;
+    m_romBytes.clear();
+    vbgo_tiletrack_reset();
+    g_joypadBitmask = 0;
+    g_frameReady = false;
+    m_frameAccumulator = 0.0f;
+    m_hasFrame = false;
+    m_achievements.GameLoaded(std::vector<uint8_t>(), false);
+    // The screen black again, as before any game.
+    {
+        std::lock_guard<std::mutex> lock(m_displayMutex);
+        std::fill(m_displayRgba.begin(), m_displayRgba.end(), uint8_t(0));
+        for (size_t i = 3; i < m_displayRgba.size(); i += 4)
+            m_displayRgba[i] = 255;
+        m_displayNew = true;
+    }
+    UploadDisplay();
+    LogLine("[Emulator] Closed %s", m_romBaseName.c_str());
+    m_romBaseName.clear();
+    return true;
+}
+
+std::string Emulator::SaveScreenshot(const XrColor4f &tint, int pattern)
+{
+    if (!m_platform || !m_romLoaded)
+        return "";
+    // The picture shown (BGRA, kFbWidth wide - the left eye in the first 384 columns).
+    constexpr uint32_t kW = VBGO_TT_WIDTH, kH = VBGO_TT_HEIGHT, kUp = 3;
+    std::vector<uint8_t> rgb(static_cast<size_t>(kW) * kH * 3);
+    {
+        std::lock_guard<std::mutex> lock(m_displayMutex);
+        if (m_displayHeight < kH || m_displayRgba.size() < static_cast<size_t>(kH) * kFbWidth * 4)
+            return "";
+        for (uint32_t y = 0; y < kH; ++y)
+        {
+            const uint8_t *row = &m_displayRgba[static_cast<size_t>(y) * kFbWidth * 4];
+            uint8_t *out = &rgb[static_cast<size_t>(y) * kW * 3];
+            for (uint32_t x = 0; x < kW; ++x)
+            {
+                out[x * 3 + 0] = row[x * 4 + 2];
+                out[x * 3 + 1] = row[x * 4 + 1];
+                out[x * 3 + 2] = row[x * 4 + 0];
+            }
+        }
+    }
+    const auto toLinear = [](float s) { return s <= 0.04045f ? s / 12.92f : std::pow((s + 0.055f) / 1.055f, 2.4f); };
+    if (pattern >= 0 && pattern < kScreenPatternCount)
+    {
+        // The Gradient mode's colors over the shades (as screen_pattern.frag):
+        // 5 stops from dark to bright.
+        uint8_t table[256][3];
+        for (int v = 0; v < 256; ++v)
+        {
+            const float scaled = v / 255.0f * 4.0f;
+            const int seg = std::clamp(static_cast<int>(scaled), 0, 3);
+            const float f = scaled - static_cast<float>(seg);
+            const XrColor4f &a = kScreenPatterns[pattern][seg], &b = kScreenPatterns[pattern][seg + 1];
+            const float c[3] = {a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f};
+            for (int k = 0; k < 3; ++k)
+                table[v][k] = static_cast<uint8_t>(std::clamp(c[k], 0.0f, 1.0f) * 255.0f + 0.5f);
+        }
+        for (size_t i = 0; i < rgb.size(); i += 3)
+        {
+            const uint8_t *c = table[rgb[i + 1]];
+            rgb[i] = c[0], rgb[i + 1] = c[1], rgb[i + 2] = c[2];
+        }
+    }
+    else if (tint.r < 0.999f || tint.g < 0.999f || tint.b < 0.999f)
+    {
+        // The Tint mode's color, as the screen multiplies it in (in linear
+        // light - the tint itself is given in sRGB, as ui_image.frag takes it).
+        uint8_t table[3][256];
+        const float t[3] = {toLinear(std::clamp(tint.r, 0.0f, 1.0f)), toLinear(std::clamp(tint.g, 0.0f, 1.0f)),
+                            toLinear(std::clamp(tint.b, 0.0f, 1.0f))};
+        for (int c = 0; c < 3; ++c)
+            for (int v = 0; v < 256; ++v)
+            {
+                const float linear = toLinear(v / 255.0f) * t[c];
+                const float back = linear <= 0.0031308f ? linear * 12.92f : 1.055f * std::pow(linear, 1.0f / 2.4f) - 0.055f;
+                table[c][v] = static_cast<uint8_t>(std::clamp(back, 0.0f, 1.0f) * 255.0f + 0.5f);
+            }
+        for (size_t i = 0; i < rgb.size(); ++i)
+            rgb[i] = table[i % 3][rgb[i]];
+    }
+    // Three times its size, every pixel a crisp block.
+    const uint32_t w = kW * kUp, h = kH * kUp;
+    std::vector<uint8_t> up(static_cast<size_t>(w) * h * 3);
+    for (uint32_t y = 0; y < h; ++y)
+        for (uint32_t x = 0; x < w; ++x)
+            std::memcpy(&up[(static_cast<size_t>(y) * w + x) * 3], &rgb[(static_cast<size_t>(y / kUp) * kW + x / kUp) * 3], 3);
+    std::vector<uint8_t> png;
+    stbi_write_png_to_func([](void *ctx, void *data, int size)
+                           {
+                               auto *out = static_cast<std::vector<uint8_t> *>(ctx);
+                               out->insert(out->end(), static_cast<uint8_t *>(data), static_cast<uint8_t *>(data) + size);
+                           },
+                           &png, static_cast<int>(w), static_cast<int>(h), 3, up.data(), static_cast<int>(w) * 3);
+    if (png.empty())
+        return "";
+    // "<game> 2026-10-12 11-32-05.png" - (a second one in the same second: " 2")
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+#if defined(_WIN32)
+    localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
+    char stamp[32];
+    std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H-%M-%S", &local);
+    std::string game = m_romBaseName;
+    for (char &c : game)
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
+            c = '_';
+    std::string name = game + " " + stamp + ".png";
+    if (name == m_lastScreenshot)
+        name = game + " " + stamp + " " + std::to_string(++m_screenshotsThisSecond + 1) + ".png";
+    else
+    {
+        m_lastScreenshot = name;
+        m_screenshotsThisSecond = 0;
+    }
+    if (!m_platform->WriteRomsFile(kScreenshotsPrefix + name, false, png.data(), png.size()))
+        return "";
+    LogLine("[Emulator] Screenshot: %s", name.c_str());
+    return name;
 }
 
 void Emulator::StopMovie()

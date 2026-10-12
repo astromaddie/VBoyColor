@@ -51,6 +51,13 @@ void SaveStatesPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                            appMenu->Hide();
                    },
                    nullptr, nullptr, UiIconId::Reset);
+    // The game's picture, as a PNG in the screenshots folder (Settings > Folders).
+    list->AddEntry("Screenshot", [appMenu](MenuItem *)
+                   {
+                       if (appMenu)
+                           appMenu->TakeScreenshot();
+                   },
+                   nullptr, nullptr, UiIconId::FlatScreen);
     m_menu.MenuItems.push_back(list);
 
     AppSettings *settings = resources.settings;

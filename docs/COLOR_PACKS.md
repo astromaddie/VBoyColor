@@ -11,7 +11,8 @@ shared freely. ROMs, save states and paintings never go into this repository.
 
 ## Desktop tools
 
-In the desktop app:
+In the desktop app, with Settings → Hotkeys → Color pack and video tools
+on (off by default - F4 to F12 are hotkeys then, see the main README):
 
 - **F9** toggles a debug view: one random color per distinct tile.
 - **F10** saves the current frame to `roms/captures/` as a paint-ready PNG

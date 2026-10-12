@@ -129,6 +129,17 @@ public:
     // Cold-resets the currently loaded game through the libretro core.
     // Returns false when no ROM is loaded.
     bool ResetGame();
+    // Closes the game (the menu's Close game): its battery save written, the
+    // core emptied, the screen black - the library with nothing running.
+    // False when no ROM is loaded.
+    bool CloseGame();
+    // The game's picture as the screen shows it - the left eye, colored, the
+    // Tint mode's color or the Gradient mode's colors applied (tint and
+    // pattern: AppSettings::ScreenTint() / ScreenPattern()) - as a PNG at
+    // three times its size, into the screenshots folder
+    // (DataKind::Screenshots): "<game> <date> <time>.png". Returns the
+    // file's name, "" when there's no picture or it couldn't be written.
+    std::string SaveScreenshot(const XrColor4f &tint, int pattern);
 
     // True once Initialize() has set up the streaming screen texture -
     // *not* tied to whether a ROM is loaded, so the screen quad layer/
@@ -466,6 +477,8 @@ private:
     // build save-state/SRAM file names. Empty before any ROM loads, when
     // SaveRam/SaveState no-op.
     std::string m_romBaseName;
+    std::string m_lastScreenshot; // (two in one second: the second gets " 2" - see SaveScreenshot)
+    int m_screenshotsThisSecond = 0;
     uint32_t m_romCrc = 0, m_romSize = 0; // the loaded ROM's CRC-32 and size (color packs are matched by them too)
     bool FindPackForRom(std::string &from); // a pack made for this ROM (by its CRC), built in or in the ROMs folder
 

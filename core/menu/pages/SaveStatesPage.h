@@ -18,12 +18,14 @@ public:
     std::string Title() const override { return "Save states"; }
     std::string Subtitle() const override;
 
+    // The slot picked (the hotkeys' Save state / Load state use it too).
+    int Slot() const { return m_saveSlot; }
+    void ChangeSaveSlot(int delta);
+    void RefreshSavePreview();
+
 private:
     static constexpr int kMinSaveSlot = 0;
     static constexpr int kMaxSaveSlot = 9; // 10 slots total (0-9), matches FrontendGo's saveStates[10]
-
-    void ChangeSaveSlot(int delta);
-    void RefreshSavePreview();
 
     std::shared_ptr<MenuList::Entry> m_saveSlotEntry;
     std::shared_ptr<MenuList::Entry> m_saveEntry;

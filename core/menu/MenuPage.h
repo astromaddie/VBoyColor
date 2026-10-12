@@ -126,6 +126,8 @@ public:
     void SetCaptureHook(std::function<bool(uint32_t *, uint32_t *)> hook) { m_menu.CaptureHook = std::move(hook); }
     void SetRawCaptureHook(std::function<void(const ButtonMapper::MappedButton &)> hook) { m_menu.RawCaptureHook = std::move(hook); }
     void SubmitRawCaptureInput(const ButtonMapper::MappedButton &button) { m_menu.SubmitRawCaptureInput(button); }
+    // Waiting for a button or key to bind (no hotkeys meanwhile).
+    bool Capturing() const { return static_cast<bool>(m_menu.CaptureHook) || static_cast<bool>(m_menu.RawCaptureHook); }
 
 protected:
     // A settings-style list filling the page's content area.
