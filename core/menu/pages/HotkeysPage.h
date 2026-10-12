@@ -37,6 +37,8 @@ private:
     std::shared_ptr<MenuList> m_list;
     std::vector<std::shared_ptr<MenuList::Entry>> m_rows; // one per HotkeyAction
     std::vector<int> m_rowIndex;                          // their indices in the list
+    // What each of F4 to F12 does - shown while the tools are on.
+    std::vector<std::shared_ptr<MenuList::Entry>> m_toolRows;
     AppSettings *m_settings = nullptr;
     Platform *m_platform = nullptr;
     int m_capturing = -1;          // the action waiting for its keys

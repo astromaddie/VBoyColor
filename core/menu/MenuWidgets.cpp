@@ -667,6 +667,9 @@ void MenuList::ScrollToSelection(bool instant)
 void MenuList::Update(uint32_t *buttonState, uint32_t *lastButtonState, float deltaSeconds)
 {
     MenuItem::Update(buttonState, lastButtonState, deltaSeconds);
+    // (rows hidden meanwhile - the list got shorter: no empty space left at its end)
+    Layout();
+    m_scrollTarget = std::clamp(m_scrollTarget, 0.0f, std::max(0.0f, m_contentHeight - m_height));
     const float t = std::min(1.0f, deltaSeconds * 14.0f);
     m_scroll += (m_scrollTarget - m_scroll) * t;
     if (std::abs(m_scrollTarget - m_scroll) < 0.05f)

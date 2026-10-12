@@ -55,6 +55,29 @@ void HotkeysPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                                 },
                                 nullptr, nullptr, UiIconId::Palette);
     tools->toggle = [this]() { return m_settings && m_settings->paintingTools; };
+    // ... and while they're on, which key does what (as platform/pc2d/Main.cpp has them).
+    struct ToolKey
+    {
+        const char *name, *keys;
+        UiIconId icon;
+    };
+    static constexpr ToolKey kToolKeys[] = {
+        {"Touch controls preview (Shift: edit)", "F4", UiIconId::Move},
+        {"Left eye, both eyes, right eye", "F5", UiIconId::Eye},
+        {"Save a tile sheet", "F6", UiIconId::Save},
+        {"Collect what's still uncolored", "F7", UiIconId::Palette},
+        {"Color pack on / off", "F8", UiIconId::EyeOff},
+        {"Tile debug view", "F9", UiIconId::Mapping},
+        {"Capture to paint (Shift: right eye)", "F10", UiIconId::FlatScreen},
+        {"Re-import the paintings", "F11", UiIconId::Reset},
+        {"Record a video", "F12", UiIconId::Resume},
+    };
+    for (const ToolKey &tool : kToolKeys)
+    {
+        auto row = list->AddEntry(tool.name, nullptr, nullptr, nullptr, tool.icon);
+        row->SetValue(tool.keys);
+        m_toolRows.push_back(row);
+    }
 
     list->AddSpacer(kGroupGap);
     auto reset = list->AddEntry("Reset hotkeys", [this](MenuItem *) { ResetAll(); }, nullptr, nullptr, UiIconId::ResetView);
@@ -180,6 +203,8 @@ void HotkeysPage::RefreshLabels(bool save)
     for (int i = 0; i < kHotkeyActionCount; ++i)
         if (i != m_capturing)
             m_rows[i]->SetValue(HotkeyName(m_settings->hotkeys[i]));
+    for (const auto &row : m_toolRows)
+        row->Visible = m_settings->paintingTools;
     if (save && m_platform)
         m_settings->Save(*m_platform);
 }
