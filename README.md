@@ -194,8 +194,9 @@ game. With no game loaded, the menu sits inside a Virtual Boy.
 
 ### Android TV and Fire TV
 
-The same APK runs on Android TV boxes and Fire TV (64-bit ARM, with
-Vulkan), played with a gamepad. TVs have no browser to download it with, so
+The same APK runs on Android TV boxes and Fire TV devices that run 64-bit
+Android with Vulkan (many Fire TV sticks run 32-bit Android, which VBoy
+Color doesn't support yet), played with a gamepad. To download it on the TV,
 install the **Downloader** app (by AFTVnews) from the TV's app store, type
 in the APK's link from [Releases](https://github.com/yuk27/VBoyColor/releases)
 and allow Downloader to install apps when the TV asks. Pick the folder with
