@@ -302,6 +302,7 @@ private:
     std::vector<uint8_t> m_objectIsFigure; // per object: a background figure (not a sprite)
     std::vector<int32_t> m_objectFamily;   // per object: its figure sheet (one character's frames), or -1
     std::vector<uint8_t> m_objectPalette;  // per object: the palette all its pixels were drawn in, or 0xFF
+    std::vector<uint8_t> m_objectOnAuto;   // per object: its colors on auto tiles count (a kAutoContextMagic painting's)
     int32_t m_families = 0;
     std::unordered_set<uint32_t> m_looseTiles; // background tiles seen outside figures
     std::vector<Vote> m_contextVotes;

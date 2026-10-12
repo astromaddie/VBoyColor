@@ -189,7 +189,11 @@ pixel after the per-pixel records (version 1 files from older captures still
 import, just without cell colors or fills), and the palette block
 (`VBGOPAL2`) adds the game's brightness level; newer captures follow it
 with what every pixel showed (`VBGOSHW1`, RGB at 1x); character sheets add a
-figure id per pixel (`VBGOFIG1`, 16 bit). `.vbcp` version 3 adds the
+figure id per pixel (`VBGOFIG1`, 16 bit). Two flags may follow: `VBGOAUT1`
+(the painting's magenta means "auto colors, unless a layer paints it") and
+`VBGOACX1` (its sprites keep their colors on tiles otherwise left to the auto
+colors - a plain filled tile the scenery leaves auto - switched on by their
+own tiles nearby, like any per-character colors). `.vbcp` version 3 adds the
 palette and map cell colors and the reference brightness, optionally followed
 by the per-character colors (`VBGOCTX1`, then `VBGOCTXL` marking the
 background figures' ones - older builds skip both) and the tiles a

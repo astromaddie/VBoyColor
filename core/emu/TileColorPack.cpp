@@ -23,6 +23,7 @@ namespace
     constexpr char kAmbiguousMagic[8] = {'V', 'B', 'G', 'O', 'A', 'M', 'B', '1'};
     constexpr char kEyeMagic[8] = {'V', 'B', 'G', 'O', 'E', 'Y', 'E', '1'};      // sidecar: per pixel, 1 = a right picture's own (right-eye capture)
     constexpr char kAutoMagic[8] = {'V', 'B', 'G', 'O', 'A', 'U', 'T', '1'};     // sidecar flag: this painting's magenta means "auto colors, unless a layer paints it"
+    constexpr char kAutoContextMagic[8] = {'V', 'B', 'G', 'O', 'A', 'C', 'X', '1'}; // sidecar flag: its sprites keep their colors on tiles left to the auto colors (by their markers)
     constexpr char kEyeTilesMagic[8] = {'V', 'B', 'G', 'O', 'E', 'Y', 'T', '1'}; // pack: tiles painted in right-eye captures, after those
     constexpr char kRomMagic[8] = {'V', 'B', 'G', 'O', 'R', 'O', 'M', '1'}; // the pack's last 16 bytes: + ROM CRC-32, size   // tiles painted two ways in a frame, after those
 
@@ -128,6 +129,7 @@ void TileColorPack::Clear()
     m_objectIsFigure.clear();
     m_objectFamily.clear();
     m_objectPalette.clear();
+    m_objectOnAuto.clear();
     m_families = 0;
     m_looseTiles.clear();
     m_contextVotes.clear();
@@ -226,6 +228,7 @@ bool TileColorPack::AddPainting(const uint8_t *pixels, int width, int height, in
     const uint8_t *figureIds = nullptr;
     const uint8_t *rightOwn = nullptr; // (a right-eye capture: its right pictures' own pixels)
     bool autoMagenta = false;          // (magenta: the auto colors wherever no layer of its own paints the pixel)
+    bool onAuto = false;               // (its sprites' colors on auto tiles count - see kAutoContextMagic)
     int level = -1;
     size_t offset = headerSize + count * (v2 ? 12 : 8);
     if (sidecar.size() >= offset + 4)
@@ -268,6 +271,11 @@ bool TileColorPack::AddPainting(const uint8_t *pixels, int width, int height, in
             else if (std::memcmp(&sidecar[offset], kAutoMagic, 8) == 0)
             {
                 autoMagenta = true;
+                offset += 8;
+            }
+            else if (std::memcmp(&sidecar[offset], kAutoContextMagic, 8) == 0)
+            {
+                onAuto = true;
                 offset += 8;
             }
             else
@@ -330,6 +338,7 @@ bool TileColorPack::AddPainting(const uint8_t *pixels, int width, int height, in
             m_objectIsFigure.push_back(figureBg[k]);
             m_objectFamily.push_back(family);
             m_objectPalette.push_back(0xFF);
+            m_objectOnAuto.push_back(0);
         }
         for (int32_t &o : object)
             if (o >= 0)
@@ -422,6 +431,7 @@ bool TileColorPack::AddPainting(const uint8_t *pixels, int width, int height, in
             m_objectIsFigure.push_back(layer >= 32);
             m_objectFamily.push_back(-1);
             m_objectPalette.push_back(palette);
+            m_objectOnAuto.push_back(onAuto);
             for (const size_t i : group.second)
                 object[i] = id;
         }
@@ -589,6 +599,7 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
         bool figures = false; // only background figures paint it so (their markers count on their own layer)
         int32_t family = -1;  // all its objects are frames of one figure sheet's character
         bool usual = false;   // the tile's usual colors (switched on by the objects that paint it so)
+        bool onAuto = false;  // a tile left to the auto colors, by opted-in paintings (see kAutoContextMagic)
     };
     std::vector<Pending> pending;
     const size_t total = m_contextVotes.size();
@@ -600,9 +611,29 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
             ++end;
         const uint32_t hash = static_cast<uint32_t>(hashKey);
         const Tile *base = Find(hash);
+        // A tile left to the auto colors (magenta: a plain filled tile the
+        // scenery shows everywhere) has no colors of its own. A painting that
+        // says so (kAutoContextMagic) still colors it on its sprites, by their
+        // markers: every pixel they paint there differs from the auto colors
+        // (Wario Land's host: his belly's plain patches). Only such paintings'
+        // sprites - any other object painting it stays out (the sprites that
+        // cross Teleroboxer's portraits would take their colors), and the
+        // scenery stays auto.
+        static const Tile kAutoTile{};
+        const bool autoTile = !base && m_leftUncolored.count(hash) != 0;
+        if (autoTile)
+            base = &kAutoTile;
         std::vector<Object> objects;
         for (size_t i = run; base && i < end;)
         {
+            if (autoTile && !(m_contextVotes[i].extra < m_objectOnAuto.size() && m_objectOnAuto[m_contextVotes[i].extra]))
+            {
+                // (not an opted-in object: past its votes)
+                const uint32_t id = m_contextVotes[i].extra;
+                while (i < end && m_contextVotes[i].extra == id)
+                    ++i;
+                continue;
+            }
             Object o;
             o.id = m_contextVotes[i].extra;
             // An object drawn in a palette whose own colors it paints exactly
@@ -636,7 +667,7 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
                 o.mask |= 1ull << px;
                 o.rgb[px] = color;
                 ++o.painted;
-                if ((base->mask >> px & 1) && distance(color, rgbOf(base->rgb[px])) > kDiffers)
+                if (autoTile || ((base->mask >> px & 1) && distance(color, rgbOf(base->rgb[px])) > kDiffers))
                     ++o.differs;
                 if (own && (!(own->mask >> px & 1) || distance(color, rgbOf(own->rgb[px])) > kDiffers))
                     ++ownDiffers;
@@ -653,6 +684,8 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
         for (int kind = 0; kind < 2; ++kind)
         {
             const bool figures = kind == 1;
+            if (figures && autoTile)
+                continue;
             std::vector<Object> objects;
             for (const Object &o : all)
                 if ((o.id < m_objectIsFigure.size() && m_objectIsFigure[o.id] != 0) == figures)
@@ -752,6 +785,7 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
                 Pending p{hash, std::move(markers), *base, 0, 0};
                 p.figures = figures;
                 p.family = family;
+                p.onAuto = autoTile;
                 for (unsigned px = 0; px < 64; ++px)
                 {
                     std::vector<uint32_t> colors;
@@ -832,6 +866,7 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
                 {
                     Pending p{hash, std::move(markers), *base, usualPixels, base->mask};
                     p.usual = true;
+                    p.onAuto = autoTile;
                     pending.push_back(std::move(p));
                 }
             }
@@ -844,7 +879,8 @@ void TileColorPack::ResolveContexts(ImportStats &stats)
     {
         std::unordered_set<uint32_t> shared;
         for (const Pending &p : pending)
-            shared.insert(p.hash);
+            if (!p.onAuto) // (an auto tile's opted-in ways leave it the marker it was)
+                shared.insert(p.hash);
         for (Pending &p : pending)
             if (p.family < 0) // (a sheet character's frames are switched on by all its tiles - see below)
                 p.markers.erase(std::remove_if(p.markers.begin(), p.markers.end(), [&shared](uint32_t m) { return shared.count(m) != 0; }),
@@ -1351,6 +1387,7 @@ void TileColorPack::FinishImport(ImportStats &stats)
     m_objectIsFigure.clear();
     m_objectFamily.clear();
     m_objectPalette.clear();
+    m_objectOnAuto.clear();
     m_families = 0;
     m_looseTiles.clear();
     m_tileShades.clear();
