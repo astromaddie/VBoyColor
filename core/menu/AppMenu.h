@@ -164,11 +164,14 @@ public:
 
     // Typing on a real keyboard (the window app): while a text field is open
     // (WantsText), its characters (UTF-8), Backspace and Enter go to it - and
-    // the keys the menu otherwise uses (S, A, W, D, Backspace) don't.
+    // the keys the menu otherwise uses (S, A, W, D, Backspace) don't. Paste
+    // and Copy: Ctrl+V and Ctrl+C (the system clipboard, Platform's).
     bool WantsText() const;
     void TypeText(const std::string &utf8);
     void TypeBackspace();
     void TypeEnter();
+    void TypePaste();
+    void TypeCopy();
 
 private:
     class Sidebar;

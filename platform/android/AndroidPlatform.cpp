@@ -405,6 +405,38 @@ void AndroidPlatform::OpenUrl(const std::string &url)
     env->DeleteLocalRef(urlJString);
 }
 
+std::string AndroidPlatform::GetClipboardText()
+{
+    JNIEnv *env = Env();
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID get = env->GetMethodID(activityClass, "getClipboardText", "()[B");
+    env->DeleteLocalRef(activityClass);
+    auto array = static_cast<jbyteArray>(env->CallObjectMethod(m_activity, get));
+    std::string text;
+    if (array)
+    {
+        const jsize length = env->GetArrayLength(array);
+        text.resize(static_cast<size_t>(length));
+        if (length > 0)
+            env->GetByteArrayRegion(array, 0, length, reinterpret_cast<jbyte *>(&text[0]));
+        env->DeleteLocalRef(array);
+    }
+    return text;
+}
+
+void AndroidPlatform::SetClipboardText(const std::string &text, bool sensitive)
+{
+    JNIEnv *env = Env();
+    jclass activityClass = env->GetObjectClass(m_activity);
+    jmethodID set = env->GetMethodID(activityClass, "setClipboardText", "([BZ)V");
+    env->DeleteLocalRef(activityClass);
+    jbyteArray array = env->NewByteArray(static_cast<jsize>(text.size()));
+    if (!text.empty())
+        env->SetByteArrayRegion(array, 0, static_cast<jsize>(text.size()), reinterpret_cast<const jbyte *>(text.data()));
+    env->CallVoidMethod(m_activity, set, array, static_cast<jboolean>(sensitive));
+    env->DeleteLocalRef(array);
+}
+
 std::vector<uint8_t> AndroidPlatform::LoadAssetBytes(const std::string &name)
 {
     if (!m_assetManager)

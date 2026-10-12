@@ -11,12 +11,15 @@ import android.content.SharedPreferences;
 import android.content.UriPermission;
 import android.content.pm.PackageInstaller;
 import android.app.PendingIntent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.os.PersistableBundle;
 import android.provider.DocumentsContract;
 import android.util.Log;
 import android.view.HapticFeedbackConstants;
@@ -30,6 +33,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -916,6 +920,49 @@ public class MainActivity extends NativeActivity {
         String status = installStatus;
         installStatus = null;
         return status == null ? "" : status;
+    }
+
+    // The clipboard, for the text fields' Paste and Copy (UTF-8 bytes - JNI's
+    // own strings are "modified" UTF-8). Android shows its own "pasted" /
+    // "copied" note; a password's copy is marked sensitive (Android 13+ then
+    // keeps it out of the clipboard's preview).
+    public byte[] getClipboardText() {
+        try {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            ClipData clip = clipboard != null ? clipboard.getPrimaryClip() : null;
+            if (clip == null || clip.getItemCount() == 0) {
+                return new byte[0];
+            }
+            CharSequence text = clip.getItemAt(0).coerceToText(this);
+            return text == null ? new byte[0] : text.toString().getBytes(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            Log.w(TAG, "getClipboardText failed", e);
+            return new byte[0];
+        }
+    }
+
+    public void setClipboardText(byte[] utf8, final boolean sensitive) {
+        final String text = new String(utf8, StandardCharsets.UTF_8);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard == null) {
+                        return;
+                    }
+                    ClipData clip = ClipData.newPlainText("VBoy Color", text);
+                    if (sensitive) {
+                        PersistableBundle extras = new PersistableBundle();
+                        extras.putBoolean("android.content.extra.IS_SENSITIVE", true); // (ClipDescription.EXTRA_IS_SENSITIVE)
+                        clip.getDescription().setExtras(extras);
+                    }
+                    clipboard.setPrimaryClip(clip);
+                } catch (Exception e) {
+                    Log.w(TAG, "setClipboardText failed", e);
+                }
+            }
+        });
     }
 
     public void openUrl(final String url) {

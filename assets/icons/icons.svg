@@ -296,4 +296,22 @@
     <rect x="17.5" y="284.5" width="15" height="3.5" style="fill:#ffffff;fill-opacity:1;stroke:none" />
     <rect x="14.5" y="288" width="21" height="4" style="fill:#ffffff;fill-opacity:1;stroke:none" />
   </g>
+  <rect id="icon-frame-eye" data-icon-path="eye_icon.png" x="50" y="250" width="50" height="50" style="fill:#000000;fill-opacity:0;stroke:none" />
+  <g id="art-eye">
+    <path d="M 54,275 C 61,263.5 89,263.5 96,275 C 89,286.5 61,286.5 54,275 Z" style="fill:none;stroke:#ffffff;stroke-width:3.4;stroke-linejoin:round" />
+    <circle cx="75" cy="275" r="7" style="fill:#ffffff;fill-opacity:1;stroke:none" />
+  </g>
+  <rect id="icon-frame-eye-off" data-icon-path="eye_off_icon.png" x="100" y="250" width="50" height="50" style="fill:#000000;fill-opacity:0;stroke:none" />
+  <clipPath id="clip-eye-off">
+    <!-- the frame minus a band around the slash, so the slash stands apart from the eye -->
+    <polygon points="105.23,250 150,250 150,294.77" />
+    <polygon points="100,255.23 100,300 144.77,300" />
+  </clipPath>
+  <g id="art-eye-off">
+    <g clip-path="url(#clip-eye-off)">
+      <path d="M 104,275 C 111,263.5 139,263.5 146,275 C 139,286.5 111,286.5 104,275 Z" style="fill:none;stroke:#ffffff;stroke-width:3.4;stroke-linejoin:round" />
+      <circle cx="125" cy="275" r="7" style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    </g>
+    <line x1="108" y1="258" x2="142" y2="292" style="stroke:#ffffff;stroke-width:3.4;stroke-linecap:round" />
+  </g>
 </svg>

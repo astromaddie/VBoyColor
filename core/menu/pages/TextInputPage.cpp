@@ -1,4 +1,5 @@
 #include "menu/pages/TextInputPage.h"
+#include "io/Platform.h"
 #include "menu/pages/AppMenuLayout.h"
 
 #include <algorithm>
@@ -19,7 +20,8 @@ namespace
     }
 
     // The keys. Letters and digits in rows of ten; the last row's special
-    // keys are wider (in tenths of the row).
+    // keys are wider (in tenths of the row). Above them, the field's row: the
+    // eye (inside the field, at its end - a password's), Copy and Paste.
     enum Special
     {
         KeyChar,
@@ -27,7 +29,10 @@ namespace
         KeySymbols,
         KeySpace,
         KeyDelete,
-        KeyDone
+        KeyDone,
+        KeyReveal,
+        KeyCopy,
+        KeyPaste
     };
     const char *const kLower[] = {"1234567890", "qwertyuiop", "asdfghjkl@", "zxcvbnm-_."};
     const char *const kUpper[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL@", "ZXCVBNM-_."};
@@ -39,6 +44,10 @@ namespace
     // The field's place and the keyboard's, in the menu's logical units.
     constexpr float kFieldY = kContentTop + 2.0f, kFieldH = 18.0f;
     constexpr float kKeysY = kFieldY + kFieldH + 8.0f, kKeyH = 22.0f, kKeyGap = 3.0f;
+    constexpr float kToolW = 32.0f; // Copy, Paste
+    constexpr float kEyeW = 20.0f;
+    constexpr float kNoticeSeconds = 2.0f;
+    constexpr size_t kMaxBytes = 128;
 } // namespace
 
 class TextInputPage::Keyboard : public MenuItem
@@ -57,12 +66,46 @@ public:
         float x = 0, y = 0, w = 0, h = kKeyH;
     };
 
+    bool HasClipboard() const { return m_res.platform && m_res.platform->HasClipboard(); }
+    // The field's row has keys: the eye (a password's), Copy and Paste.
+    bool HasTools() const { return m_page.m_hidden || HasClipboard(); }
+    // The field: the row's width, less Copy and Paste.
+    float FieldWidth() const { return kContentWidth - (HasClipboard() ? 2.0f * (kToolW + kKeyGap) : 0.0f); }
+
     // The keys as laid out now (shift and symbols change the letters).
     std::vector<std::vector<Key>> Rows() const
     {
         std::vector<std::vector<Key>> rows;
+        if (HasTools())
+        {
+            std::vector<Key> tools;
+            const float fieldRight = kContentX + FieldWidth();
+            if (m_page.m_hidden)
+            {
+                Key eye;
+                eye.kind = KeyReveal;
+                eye.x = fieldRight - kEyeW;
+                eye.y = kFieldY;
+                eye.w = kEyeW;
+                eye.h = kFieldH;
+                tools.push_back(eye);
+            }
+            if (HasClipboard())
+                for (Special kind : {KeyCopy, KeyPaste})
+                {
+                    Key key;
+                    key.kind = kind;
+                    key.x = fieldRight + kKeyGap + (kind == KeyPaste ? kToolW + kKeyGap : 0.0f);
+                    key.y = kFieldY;
+                    key.w = kToolW;
+                    key.h = kFieldH;
+                    tools.push_back(key);
+                }
+            rows.push_back(tools);
+        }
         const char *const *letters = m_symbols ? kSymbols : (m_shift ? kUpper : kLower);
         const float unit = (kContentWidth - 9.0f * kKeyGap) / 10.0f;
+        int keyRows = 0; // (the keyboard's rows so far)
         for (int r = 0; r < 4; ++r)
         {
             std::vector<Key> row;
@@ -77,12 +120,13 @@ public:
                 Key key;
                 key.text = std::string(1, c);
                 key.x = x;
-                key.y = kKeysY + static_cast<float>(rows.size()) * (kKeyH + kKeyGap);
+                key.y = kKeysY + static_cast<float>(keyRows) * (kKeyH + kKeyGap);
                 key.w = unit;
                 row.push_back(key);
                 x += unit + kKeyGap;
             }
             rows.push_back(row);
+            ++keyRows;
         }
         std::vector<Key> bottom;
         float x = kContentX;
@@ -92,7 +136,7 @@ public:
             Key key;
             key.kind = kBottom[i];
             key.x = x;
-            key.y = kKeysY + static_cast<float>(rows.size()) * (kKeyH + kKeyGap);
+            key.y = kKeysY + static_cast<float>(keyRows) * (kKeyH + kKeyGap);
             key.w = total * kBottomWidth[i] / 10.0f;
             bottom.push_back(key);
             x += key.w + kKeyGap;
@@ -115,6 +159,12 @@ public:
             return "Delete";
         case KeyDone:
             return "Done";
+        case KeyCopy:
+            return "Copy";
+        case KeyPaste:
+            return "Paste";
+        case KeyReveal:
+            return ""; // (an icon)
         default:
             return key.text;
         }
@@ -139,6 +189,15 @@ public:
             break;
         case KeyDone:
             m_page.Finish();
+            break;
+        case KeyReveal:
+            m_page.m_reveal = !m_page.m_reveal;
+            break;
+        case KeyCopy:
+            m_page.Copy();
+            break;
+        case KeyPaste:
+            m_page.Paste();
             break;
         default:
             m_page.TypeText(key.text);
@@ -207,9 +266,9 @@ public:
 
     void ResetSelection() override
     {
-        m_row = 1;
-        m_col = 0;
         m_shift = m_symbols = false;
+        m_row = HasTools() ? 2 : 1; // (on the q)
+        m_col = 0;
     }
 
     bool HandlePointer(const MenuPointer &pointer) override
@@ -238,6 +297,7 @@ public:
     {
         MenuItem::Update(buttonState, lastButtonState, deltaSeconds);
         m_blink += deltaSeconds;
+        m_page.m_noticeTime = std::max(0.0f, m_page.m_noticeTime - deltaSeconds);
     }
 
     void Draw(UiRenderer &ui, float offsetX, float offsetY, float alpha) override
@@ -245,16 +305,16 @@ public:
         const UiFontHandle body = m_res.bodyFont, bold = m_res.bodyBoldFont;
 
         // The field: the text (or dots), the end of it in view, and a caret.
-        const float fx = kContentX + offsetX, fy = kFieldY + offsetY;
-        ui.DrawQuadRounded(fx, fy, kContentWidth, kFieldH, WithAlpha(kMenuCardColor, alpha), kCardRadius);
-        ui.DrawQuadRounded(fx, fy + kFieldH - 1.2f, kContentWidth, 1.2f, WithAlpha(kMenuSelectionColor, alpha * 0.8f), 0.6f);
+        const float fx = kContentX + offsetX, fy = kFieldY + offsetY, fw = FieldWidth();
+        ui.DrawQuadRounded(fx, fy, fw, kFieldH, WithAlpha(kMenuCardColor, alpha), kCardRadius);
+        ui.DrawQuadRounded(fx, fy + kFieldH - 1.2f, fw, 1.2f, WithAlpha(kMenuSelectionColor, alpha * 0.8f), 0.6f);
         std::string shown;
-        if (m_page.m_hidden)
+        if (m_page.m_hidden && !m_page.m_reveal)
             for (size_t i = 0; i < CharCount(m_page.m_text); ++i)
                 shown += "\xE2\x80\xA2";
         else
             shown = m_page.m_text;
-        const float room = kContentWidth - 16.0f;
+        const float room = fw - 16.0f - (m_page.m_hidden ? kEyeW : 0.0f);
         while (!shown.empty() && ui.GetTextWidth(body, shown) > room)
         {
             size_t cut = 1;
@@ -276,6 +336,25 @@ public:
                 const Key &k = rows[r][c];
                 const float x = k.x + offsetX, y = k.y + offsetY;
                 const bool sel = Selected && r == m_row && c == m_col;
+                if (k.kind == KeyReveal)
+                {
+                    // The eye, at the field's end: crossed out while the
+                    // password is dots, open (and lit) while it's shown.
+                    if (sel)
+                    {
+                        ui.DrawQuadRounded(x - 1.2f, y - 1.2f, k.w + 2.4f, k.h + 2.4f, WithAlpha(kMenuSelectionColor, alpha), 5.0f);
+                        ui.DrawQuadRounded(x, y, k.w, k.h, WithAlpha(kMenuCardColor, alpha), 4.0f);
+                        ui.DrawQuadRounded(x, y, k.w, k.h, WithAlpha(kMenuSelectionFillColor, alpha), 4.0f);
+                    }
+                    if (m_res.icons)
+                    {
+                        const float size = 14.0f;
+                        const XrColor4f tint = sel || m_page.m_reveal ? kMenuSelectionColor : kMenuDimTextColor;
+                        m_res.icons->Draw(ui, m_page.m_reveal ? UiIconId::Eye : UiIconId::EyeOff, x + (k.w - size) / 2.0f,
+                                          y + (k.h - size) / 2.0f, size, alpha, tint);
+                    }
+                    continue;
+                }
                 const bool special = k.kind != KeyChar;
                 const bool on = (k.kind == KeyShift && m_shift) || (k.kind == KeySymbols && m_symbols);
                 XrColor4f fill = special ? XrColor4f{0.17f, 0.18f, 0.24f, 1.0f} : kMenuCardColor;
@@ -291,10 +370,24 @@ public:
                     ui.DrawQuadRounded(x, y, k.w, k.h, WithAlpha(fill, alpha), 4.0f);
                 const std::string label = Label(k);
                 const UiFontHandle font = sel ? bold : (special ? m_res.captionBoldFont : body);
-                const XrColor4f color = sel || on || k.kind == KeyDone ? kMenuSelectionColor : kMenuTextColor;
+                // (Copy can't while a password is dots)
+                const bool unavailable = k.kind == KeyCopy && m_page.m_hidden && !m_page.m_reveal;
+                const XrColor4f color = sel || on || k.kind == KeyDone ? kMenuSelectionColor
+                                        : unavailable                  ? kMenuDimTextColor
+                                                                       : kMenuTextColor;
                 ui.DrawText(font, label, x + (k.w - ui.GetTextWidth(font, label)) / 2.0f, TextY(ui, font, y + k.h / 2.0f), 1.0f,
                             WithAlpha(color, alpha));
             }
+
+        // A notice under the keys for a moment ("Pasted"), fading out.
+        if (m_page.m_noticeTime > 0 && !m_page.m_notice.empty())
+        {
+            const Key &last = rows.back().front();
+            const UiFontHandle font = m_res.captionFont;
+            const float fade = std::min(1.0f, m_page.m_noticeTime / 0.4f);
+            ui.DrawText(font, m_page.m_notice, kContentX + offsetX + (kContentWidth - ui.GetTextWidth(font, m_page.m_notice)) / 2.0f,
+                        TextY(ui, font, last.y + last.h + 9.0f + offsetY), 1.0f, WithAlpha(kMenuDimTextColor, alpha * fade));
+        }
     }
 
     static size_t CharCount(const std::string &utf8)
@@ -315,6 +408,8 @@ public:
 
 void TextInputPage::Init(UiRenderer &ui, const UiMenuResources &resources)
 {
+    m_ui = &ui;
+    m_res = &resources;
     for (UiFontHandle font : {resources.bodyFont, resources.bodyBoldFont, resources.captionBoldFont})
         ui.EnsureGlyphsForText(font, "\xE2\x80\xA2!#$%&*()+=[]{}<>/\\|~;:'\",?^`@-_.SHIFTabc");
     m_keyboard = std::make_shared<Keyboard>(*this, resources);
@@ -345,6 +440,8 @@ void TextInputPage::Open(const std::string &title, const std::string &text, bool
     m_title = title;
     m_text = text;
     m_hidden = hidden;
+    m_reveal = false;
+    m_noticeTime = 0;
     m_done = std::move(done);
     if (m_keyboard)
     {
@@ -355,8 +452,12 @@ void TextInputPage::Open(const std::string &title, const std::string &text, bool
 
 void TextInputPage::TypeText(const std::string &utf8)
 {
-    if (m_text.size() + utf8.size() <= 128)
+    if (m_text.size() + utf8.size() <= kMaxBytes)
+    {
         m_text += utf8;
+        if (m_ui && m_res) // (a real keyboard's accented letters too)
+            m_ui->EnsureGlyphsForText(m_res->bodyFont, utf8);
+    }
     if (m_keyboard)
         m_keyboard->m_blink = 0;
 }
@@ -373,6 +474,86 @@ void TextInputPage::TypeBackspace()
 }
 
 void TextInputPage::TypeEnter() { Finish(); }
+
+Platform *TextInputPage::ClipboardPlatform() const
+{
+    return m_res && m_res->platform && m_res->platform->HasClipboard() ? m_res->platform : nullptr;
+}
+
+void TextInputPage::Paste()
+{
+    Platform *platform = ClipboardPlatform();
+    if (!platform)
+        return;
+    // Its first line, without the spaces around it (a copied password often
+    // brings a line break or a space along) or any control characters.
+    const std::string clip = platform->GetClipboardText();
+    size_t begin = 0;
+    while (begin < clip.size() && (clip[begin] == ' ' || clip[begin] == '\t' || clip[begin] == '\r' || clip[begin] == '\n'))
+        ++begin;
+    size_t end = clip.find_first_of("\r\n", begin);
+    if (end == std::string::npos)
+        end = clip.size();
+    while (end > begin && (clip[end - 1] == ' ' || clip[end - 1] == '\t'))
+        --end;
+    std::string line;
+    for (size_t i = begin; i < end; ++i)
+    {
+        const unsigned char c = static_cast<unsigned char>(clip[i]);
+        if (c >= 0x20 && c != 0x7F)
+            line += static_cast<char>(c);
+    }
+    if (line.empty())
+    {
+        Notice("Nothing to paste");
+        return;
+    }
+    // As much as fits, in whole characters.
+    const size_t room = kMaxBytes - std::min(kMaxBytes, m_text.size());
+    if (line.size() > room)
+    {
+        size_t cut = room;
+        while (cut > 0 && (static_cast<unsigned char>(line[cut]) & 0xC0) == 0x80)
+            --cut;
+        line.resize(cut);
+    }
+    if (line.empty())
+    {
+        Notice("The field is full");
+        return;
+    }
+    m_text += line;
+    if (m_ui && m_res)
+        m_ui->EnsureGlyphsForText(m_res->bodyFont, line);
+    if (m_keyboard)
+        m_keyboard->m_blink = 0;
+    Notice("Pasted");
+}
+
+void TextInputPage::Copy()
+{
+    Platform *platform = ClipboardPlatform();
+    if (!platform)
+        return;
+    if (m_hidden && !m_reveal)
+    {
+        Notice("Show the password to copy it");
+        return;
+    }
+    if (m_text.empty())
+    {
+        Notice("Nothing to copy");
+        return;
+    }
+    platform->SetClipboardText(m_text, m_hidden);
+    Notice("Copied");
+}
+
+void TextInputPage::Notice(const std::string &text)
+{
+    m_notice = text;
+    m_noticeTime = kNoticeSeconds;
+}
 
 void TextInputPage::Finish()
 {

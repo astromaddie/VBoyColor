@@ -2,6 +2,7 @@
 
 #include "io/Platform.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 
@@ -65,6 +66,19 @@ public:
     // saved and shut down).
     void Relaunch() const;
     void OpenUrl(const std::string &url) override;
+
+    // The clipboard: GLFW's (Windows, X11, Wayland), hooked up by both desktop
+    // apps' main once GLFW is initialized - none until then, or if GLFW
+    // couldn't start.
+    std::function<std::string()> getClipboard;
+    std::function<void(const std::string &)> setClipboard;
+    bool HasClipboard() const override { return getClipboard != nullptr; }
+    std::string GetClipboardText() override { return getClipboard ? getClipboard() : std::string(); }
+    void SetClipboardText(const std::string &text, bool /*sensitive*/) override
+    {
+        if (setClipboard)
+            setClipboard(text);
+    }
 
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 

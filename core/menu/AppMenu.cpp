@@ -1132,3 +1132,15 @@ void AppMenu::TypeEnter()
     if (WantsText())
         m_textInputPage.TypeEnter();
 }
+
+void AppMenu::TypePaste()
+{
+    if (WantsText())
+        m_textInputPage.Paste();
+}
+
+void AppMenu::TypeCopy()
+{
+    if (WantsText())
+        m_textInputPage.Copy();
+}

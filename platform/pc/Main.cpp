@@ -46,6 +46,15 @@ int main()
     // Its own settings file: the flat VBoyColor.exe uses the same States
     // folder, with keys where this app has Touch controller inputs.
     DesktopPlatform platform("settings-vr.dat");
+    if (gamepads) // (and the text fields' Copy and Paste - see DesktopPlatform::getClipboard)
+    {
+        platform.getClipboard = []
+        {
+            const char *text = glfwGetClipboardString(nullptr);
+            return std::string(text ? text : "");
+        };
+        platform.setClipboard = [](const std::string &text) { glfwSetClipboardString(nullptr, text.c_str()); };
+    }
     OpenXrApp app;
     try
     {

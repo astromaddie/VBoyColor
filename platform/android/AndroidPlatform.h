@@ -53,6 +53,13 @@ public:
     std::string TakeUpdateStatus() override;
     void OpenUrl(const std::string &url) override;
 
+    // The clipboard: Android's ClipboardManager (MainActivity.getClipboardText
+    // / setClipboardText) - UTF-8 both ways as bytes, as JNI's own strings
+    // are "modified" UTF-8.
+    bool HasClipboard() const override { return true; }
+    std::string GetClipboardText() override;
+    void SetClipboardText(const std::string &text, bool sensitive) override;
+
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 
 private:

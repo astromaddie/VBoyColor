@@ -8,7 +8,9 @@
 // Typing a line of text without a keyboard - a user name, a password: the
 // field on top and an on-screen keyboard under it, worked with the D-pad and
 // A, a laser, a finger or the mouse; on PC a real keyboard types too (see
-// AppMenu::TypeText). Done (or Enter) hands the text back and returns to the
+// AppMenu::TypeText). Beside the field: Copy and Paste (the system's
+// clipboard, where the platform has one) and, for a password, the eye that
+// shows it as it is. Done (or Enter) hands the text back and returns to the
 // page that opened it; B returns without changing anything.
 class TextInputPage : public MenuPage
 {
@@ -25,6 +27,11 @@ public:
     void TypeText(const std::string &utf8);
     void TypeBackspace();
     void TypeEnter();
+    // The clipboard's text (its first line) typed in - the Paste key, Ctrl+V.
+    void Paste();
+    // The text to the clipboard - the Copy key, Ctrl+C; a password only
+    // while it's shown (as a browser does).
+    void Copy();
 
     // The page that opened it (B and Done go back there) - set by Open's caller.
     MenuPage *back = nullptr;
@@ -33,10 +40,18 @@ private:
     class Keyboard;
     friend class Keyboard;
     void Finish();
+    // A line under the keyboard for a moment ("Pasted").
+    void Notice(const std::string &text);
+    Platform *ClipboardPlatform() const;
 
     std::string m_title;
     std::string m_text;
     bool m_hidden = false;
+    bool m_reveal = false; // a hidden field shown as it is (the eye)
+    std::string m_notice;
+    float m_noticeTime = 0; // (seconds left)
+    UiRenderer *m_ui = nullptr;
+    const UiMenuResources *m_res = nullptr;
     std::function<void(const std::string &)> m_done;
     std::shared_ptr<Keyboard> m_keyboard;
 };

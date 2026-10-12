@@ -142,6 +142,15 @@ public:
     // Opens a web page in the system's browser.
     virtual void OpenUrl(const std::string & /*url*/) {}
 
+    // ---- The system clipboard (text): the text fields' Copy and Paste
+    // (menu/pages/TextInputPage.h). ----
+    virtual bool HasClipboard() const { return false; }
+    // What's on it (UTF-8) - "" when it's empty or holds no text.
+    virtual std::string GetClipboardText() { return ""; }
+    // sensitive: a password - kept out of the clipboard's previews and
+    // history where the system has a way to say so (Android 13+).
+    virtual void SetClipboardText(const std::string & /*text*/, bool /*sensitive*/) {}
+
     // Loads a bundled app asset (font/icon/image) - APK assets on Android,
     // a file next to the running executable on desktop. Empty if not found.
     virtual std::vector<uint8_t> LoadAssetBytes(const std::string &name) = 0;

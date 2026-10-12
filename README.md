@@ -91,7 +91,8 @@ pack).*
 - **RetroAchievements** - log in with your
   [RetroAchievements](https://retroachievements.org) account (Achievements in
   the menu: an on-screen keyboard types your name and password - or a real
-  keyboard on PC) and earn each game's achievements as you play. An unlock
+  keyboard on PC; Paste takes them from the clipboard, and the eye shows the
+  password as you type it) and earn each game's achievements as you play. An unlock
   pops up over the game; the Achievements page lists the game's
   achievements with their badges, unlocked and still to get. Softcore: save
   states and everything else stay on (a save state keeps the achievements'

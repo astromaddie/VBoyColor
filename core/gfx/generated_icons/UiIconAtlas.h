@@ -48,6 +48,8 @@ enum class UiIconId
     MapTriggerLeft,
     MapTriggerRight,
     Trophy,
+    Eye,
+    EyeOff,
     Count,
     None = Count,
 };
@@ -105,4 +107,6 @@ inline constexpr UiIconUv kIconUvs[static_cast<size_t>(UiIconId::Count)] = {
     { 0.010417f, 0.847222f, 0.114583f, 0.986111f, 10, 10 }, // MapTriggerLeft
     { 0.135417f, 0.847222f, 0.239583f, 0.986111f, 10, 10 }, // MapTriggerRight
     { 0.260417f, 0.847222f, 0.364583f, 0.986111f, 10, 10 }, // Trophy
+    { 0.385417f, 0.847222f, 0.489583f, 0.986111f, 10, 10 }, // Eye
+    { 0.510417f, 0.847222f, 0.614583f, 0.986111f, 10, 10 }, // EyeOff
 };

@@ -229,10 +229,12 @@ namespace
 
     // Typing into a text field (AppMenu::WantsText - a RetroAchievements
     // login): the characters typed this frame (UTF-8), and Backspace/Enter
-    // presses (the keyboard's repeat too). The keys the menu otherwise uses
-    // (S, A, W, D, Backspace, Enter) don't steer it meanwhile.
+    // presses (the keyboard's repeat too), Ctrl+V / Shift+Insert (paste) and
+    // Ctrl+C (copy). The keys the menu otherwise uses (S, A, W, D, Backspace,
+    // Enter) don't steer it meanwhile.
     std::string g_typed;
     int g_typedBackspaces = 0, g_typedEnters = 0;
+    bool g_typedPaste = false, g_typedCopy = false;
     void OnChar(GLFWwindow *, unsigned int cp)
     {
         if (cp < 0x20 || cp == 0x7F)
@@ -258,14 +260,20 @@ namespace
             g_typed += static_cast<char>(0x80 | (cp & 0x3F));
         }
     }
-    void OnKey(GLFWwindow *, int key, int, int action, int)
+    void OnKey(GLFWwindow *, int key, int, int action, int mods)
     {
         if (action != GLFW_PRESS && action != GLFW_REPEAT)
             return;
+        // (Ctrl without Alt: AltGr reads as Ctrl+Alt, and types characters)
+        const bool ctrl = (mods & (GLFW_MOD_CONTROL | GLFW_MOD_ALT)) == GLFW_MOD_CONTROL;
         if (key == GLFW_KEY_BACKSPACE)
             ++g_typedBackspaces;
         else if (key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER)
             ++g_typedEnters;
+        else if (action == GLFW_PRESS && ((ctrl && key == GLFW_KEY_V) || (key == GLFW_KEY_INSERT && (mods & GLFW_MOD_SHIFT))))
+            g_typedPaste = true;
+        else if (action == GLFW_PRESS && ctrl && key == GLFW_KEY_C)
+            g_typedCopy = true;
     }
 
     // F5: the left eye's picture (as normal), both eyes side by side, or the
@@ -434,6 +442,13 @@ int main(int argc, char **argv)
         std::fprintf(stderr, "VBoy Color: glfwInit failed\n");
         return 1;
     }
+    // (the text fields' Copy and Paste - see DesktopPlatform::getClipboard)
+    platform.getClipboard = []
+    {
+        const char *text = glfwGetClipboardString(nullptr);
+        return std::string(text ? text : "");
+    };
+    platform.setClipboard = [](const std::string &text) { glfwSetClipboardString(nullptr, text.c_str()); };
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
@@ -833,11 +848,16 @@ int main(int argc, char **argv)
                     appMenu.TypeText(g_typed);
                 for (int i = 0; i < g_typedBackspaces; ++i)
                     appMenu.TypeBackspace();
+                if (g_typedPaste)
+                    appMenu.TypePaste();
+                if (g_typedCopy)
+                    appMenu.TypeCopy();
                 if (g_typedEnters > 0)
                     appMenu.TypeEnter();
             }
             g_typed.clear();
             g_typedBackspaces = g_typedEnters = 0;
+            g_typedPaste = g_typedCopy = false;
             g_typing = appMenu.WantsText();
 
             std::memcpy(lastButtonStates, buttonStates, sizeof(buttonStates));

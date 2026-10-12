@@ -60,6 +60,8 @@ ICONS = [
     ("MapTriggerLeft", "icons/mapping/trigger_left.dds"),
     ("MapTriggerRight", "icons/mapping/trigger_right.dds"),
     ("Trophy", "trophy_icon.dds"),  # (Achievements)
+    ("Eye", "eye_icon.dds"),  # (a password field: shown / hidden)
+    ("EyeOff", "eye_off_icon.dds"),
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
