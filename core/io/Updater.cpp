@@ -115,8 +115,8 @@ std::string Updater::DisplayName(const std::string &version)
 void Updater::Init(Platform &platform, const std::string &currentVersion)
 {
     m_platform = &platform;
-    m_current = "v1.0.0-beta.6"; // TEST
-    const Version v = Parse(m_current);
+    m_current = currentVersion;
+    const Version v = Parse(currentVersion);
     m_preRelease = !v.pre.empty();
     m_devBuild = m_preRelease && v.pre[0] == "dev";
 }
