@@ -630,7 +630,19 @@ int main(int argc, char **argv)
         // (an update in place: out, as on closing, then start again - see the end)
         while (!glfwWindowShouldClose(window) && !platform.RestartRequested() && !platform.QuitRequested())
         {
+            // (a frame that took long: where the time went, in the log - see the end of the loop)
+            using FrameClock = std::chrono::steady_clock;
+            const auto frameStart = FrameClock::now();
+            float stageMs[8]{};
+            auto stageMark = frameStart;
+            auto stage = [&](int i)
+            {
+                const auto now = FrameClock::now();
+                stageMs[i] += std::chrono::duration<float, std::milli>(now - stageMark).count();
+                stageMark = now;
+            };
             glfwPollEvents();
+            stage(0);
 
             // Minimized (0x0 framebuffer) - a zero-extent swapchain is
             // invalid, so just wait for the window to become usable again
@@ -890,7 +902,9 @@ int main(int argc, char **argv)
             std::memcpy(lastButtonStates, buttonStates, sizeof(buttonStates));
             PollDesktopButtonState(window, buttonStates);
             const bool menuWasOpen = appMenu.IsOpen();
+            stage(1);
             appMenu.Update(buttonStates, lastButtonStates, deltaSeconds);
+            stage(2);
 
             // Esc opens the menu from a game too (in the menu it's Back) -
             // after the menu's update, so the press that opens it isn't also
@@ -932,8 +946,10 @@ int main(int argc, char **argv)
                 emulator.RunFrame(deltaSeconds);
             }
 
+            stage(3);
             if (appMenu.NeedsDraw())
                 appMenu.RenderToBuffer(uiRenderer);
+            stage(4);
             const int anaglyph = g_eyeView == 0 ? AnaglyphOf(settings.screen3D) : 0;
             emulator.PrepareScreen(uiRenderer, chosen.format, settings.ScreenTint(), settings.ScreenPattern(),
                                    settings.screenLook, anaglyph);
@@ -950,6 +966,7 @@ int main(int argc, char **argv)
             if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
                 continue;
             vkWaitForFences(renderer.GetDevice(), 1, &acquireFence, VK_TRUE, UINT64_MAX);
+            stage(5);
 
             // UiRenderer::EndFrame blocks internally (vkQueueWaitIdle) until
             // rendering is complete, so presenting right after is safe
@@ -1006,12 +1023,27 @@ int main(int argc, char **argv)
                     appMenu.Draw(uiRenderer, panes[i].ox + menuX * panes[i].qx, panes[i].oy + menuY * panes[i].qy, panes[i].qx,
                                  panes[i].qy);
             uiRenderer.EndFrame();
+            stage(6);
 
             VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
             presentInfo.swapchainCount = 1;
             presentInfo.pSwapchains = &swapchain;
             presentInfo.pImageIndices = &imageIndex;
             const VkResult presentResult = vkQueuePresentKHR(renderer.GetQueue(), &presentInfo);
+            stage(7);
+            {
+                const float total = std::chrono::duration<float, std::milli>(FrameClock::now() - frameStart).count();
+                static auto lastSlowLog = FrameClock::now() - std::chrono::seconds(10);
+                if (total > 40.0f && FrameClock::now() - lastSlowLog > std::chrono::milliseconds(500))
+                {
+                    lastSlowLog = FrameClock::now();
+                    std::printf("[Frame] %.1f ms: events %.1f, input %.1f, menu %.1f, game %.1f, menu picture %.1f, "
+                                "screen wait %.1f, drawing %.1f, present %.1f\n",
+                                total, stageMs[0], stageMs[1], stageMs[2], stageMs[3], stageMs[4], stageMs[5], stageMs[6],
+                                stageMs[7]);
+                    std::fflush(stdout);
+                }
+            }
             if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
                 recreateSwapchain();
         }
