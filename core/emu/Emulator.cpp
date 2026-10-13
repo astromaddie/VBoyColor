@@ -1847,7 +1847,10 @@ void Emulator::SaveRam()
     if (size == 0 || !data)
         return; // this ROM has no battery-backed SRAM
 
+    const auto start = std::chrono::steady_clock::now();
     m_platform->WriteRomsFile(m_romBaseName + ".srm", false, data, size);
+    LogLine("[Emulator] Saved the game's save RAM (%zu bytes) in %.1f ms", size,
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
     m_savedRam.assign(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
 }
 
