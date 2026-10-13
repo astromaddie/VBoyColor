@@ -12,6 +12,7 @@
 
 #include <array>
 #include <atomic>
+#include <future>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
@@ -431,7 +432,7 @@ private:
     std::string ToggleRecordingLocked();
     // Saves cart SRAM when the game changed it (checked every few seconds
     // from RunFrame, so a game's saves survive the app being closed).
-    void FlushRamIfChanged();
+    void FlushRamIfChanged(bool background = false);
     void RecordFrame();
     void PaintTileDebugView();
     // Tells the tracker which fills to tag (see SetAuthoring).
@@ -454,7 +455,11 @@ private:
 
     // Cart battery-save, matches FrontendGo's <romDir>/<stem>.srm. Must run
     // before retro_unload_game() - the SRAM pointer isn't valid after.
-    void SaveRam();
+    // background: written on a thread of its own (a write through Android's
+    // folder access takes 50-150 ms - a hitch on the render thread); a save
+    // still being written then waits for the next check.
+    void SaveRam(bool background = false);
+    std::future<void> m_ramWrite;
     void LoadRam();
 
     UiRenderer *m_ui = nullptr;

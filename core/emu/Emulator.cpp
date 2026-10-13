@@ -704,7 +704,7 @@ void Emulator::RunFrame(float deltaSeconds)
         if (emu.owns_lock())
         {
             m_ramCheckSeconds = 0.0f;
-            FlushRamIfChanged();
+            FlushRamIfChanged(true);
         }
     }
 }
@@ -1835,7 +1835,7 @@ bool Emulator::LoadStatePreview(int uiSlot, std::vector<uint8_t> &outRgba) const
     return true;
 }
 
-void Emulator::SaveRam()
+void Emulator::SaveRam(bool background)
 {
     // (aside: saved when it was set aside - the core holds another game now;
     // a movie's: never - the player's own save stays as it was)
@@ -1843,18 +1843,26 @@ void Emulator::SaveRam()
         return;
 
     const size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    void *data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    const auto *data = static_cast<const uint8_t *>(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM));
     if (size == 0 || !data)
         return; // this ROM has no battery-backed SRAM
 
-    const auto start = std::chrono::steady_clock::now();
-    m_platform->WriteRomsFile(m_romBaseName + ".srm", false, data, size);
-    LogLine("[Emulator] Saved the game's save RAM (%zu bytes) in %.1f ms", size,
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
-    m_savedRam.assign(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
+    if (m_ramWrite.valid())
+    {
+        if (background && m_ramWrite.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            return; // (the last one is still being written: the next check)
+        m_ramWrite.get(); // (a save now lands after it)
+    }
+    std::vector<uint8_t> bytes(data, data + size);
+    if (background)
+        m_ramWrite = std::async(std::launch::async, [platform = m_platform, name = m_romBaseName + ".srm", bytes]()
+                                { platform->WriteRomsFile(name, false, bytes.data(), bytes.size()); });
+    else
+        m_platform->WriteRomsFile(m_romBaseName + ".srm", false, bytes.data(), bytes.size());
+    m_savedRam = std::move(bytes);
 }
 
-void Emulator::FlushRamIfChanged()
+void Emulator::FlushRamIfChanged(bool background)
 {
     if (!m_romLoaded || m_gameAside || m_movieSession)
         return;
@@ -1864,7 +1872,7 @@ void Emulator::FlushRamIfChanged()
         return;
     if (m_savedRam.size() == size && std::memcmp(m_savedRam.data(), data, size) == 0)
         return;
-    SaveRam();
+    SaveRam(background);
 }
 
 void Emulator::SaveRamNow()
@@ -2208,6 +2216,8 @@ void Emulator::Shutdown()
         std::fprintf(stderr, "[Emulator] %s\n", SetCollectingUncolored(false).c_str());
     if (m_romLoaded)
         SaveRam();
+    if (m_ramWrite.valid())
+        m_ramWrite.wait(); // (a save still being written)
     g_audioOutput = nullptr;
     m_audioOutput.Shutdown();
 }
