@@ -195,8 +195,9 @@ Arrange touch controls lets you drag every control where you want it and
 make it bigger or smaller (the buttons are Kenney's Input Prompts) - and a
 game can have its own layout (hold its card in the library). Connect a
 gamepad and the on-screen buttons step aside until you touch the screen
-again - or switch them off for good in Settings → Touch controls (the game
-then fills the screen; a gamepad plays). Back opens the menu, and Back (or *Back to game*) returns to the
+again - or switch them off in Settings → Touch controls: the game keeps the
+whole screen, and they only show (over it) for a few seconds after you touch
+it. Back opens the menu, and Back (or *Back to game*) returns to the
 game. With no game loaded, the menu sits inside a Virtual Boy.
 
 ### Android TV and Fire TV

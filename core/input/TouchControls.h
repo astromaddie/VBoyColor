@@ -54,6 +54,9 @@ public:
     void Draw(UiRenderer &ui) const;
 
     void SetVisible(bool visible) { m_visible = visible; }
+    // The game keeps the whole screen even while the controls show (over it):
+    // Settings' Touch controls off - they only show for a moment after a touch.
+    void SetOverGame(bool overGame) { m_overGame = overGame; }
     bool Visible() const { return m_visible; }
 
     // The games that use the right D-pad (by name): Red Alarm, Teleroboxer,
@@ -152,6 +155,7 @@ private:
     float m_fontDp = 0.0f; // the density the fonts are baked for
     UiFontHandle m_font, m_smallFont;
     bool m_visible = true;
+    bool m_overGame = false; // (see SetOverGame)
     bool m_rightDpad = false;
     float m_dp = 1.0f;
     float m_w = 0, m_h = 0;

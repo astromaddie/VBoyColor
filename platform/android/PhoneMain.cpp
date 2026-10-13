@@ -60,6 +60,12 @@ namespace
         bool gamepadGuideHeld = false;
         bool gamepadUsed = false; // since the last touch
         bool backHeld = false;
+        // Back pressed since the last frame - a quick tap (the back gesture)
+        // can be down and up again before the frame looks at backHeld.
+        bool backTapped = false;
+        // The touch controls shown (see the frame: Settings' switch, a gamepad, a touch).
+        bool touchShown = true;
+        double lastTouchSeconds = 0.0;
         std::map<int32_t, Finger> fingers;
         bool touched = false; // since the last frame
         // Lets go of the Vulkan surface: called while Android still waits
@@ -156,6 +162,8 @@ namespace
             if (keyCode == AKEYCODE_BACK && !gamepad)
             {
                 state->backHeld = down; // (the menu - not leaving the app)
+                if (down && AKeyEvent_getRepeatCount(event) == 0)
+                    state->backTapped = true;
                 return 1;
             }
             if (!gamepad)
@@ -556,16 +564,34 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         touch.SetGame(platform, emulator.RomName());
         const bool editing = touch.Editing();
 
-        // The touch controls: hidden while a gamepad plays, back on a touch -
-        // or not at all, switched off in Settings (a gamepad and Back then).
-        if (editing)
-            touch.SetVisible(true);
-        else if (!settings.touchControls)
-            touch.SetVisible(false);
-        else if (state.gamepadUsed)
-            touch.SetVisible(false);
-        else if (state.touched)
-            touch.SetVisible(true);
+        // The touch controls: hidden while a gamepad plays, back on a touch.
+        // Switched off in Settings, they start hidden, show when the screen is
+        // touched and go again a few seconds after the last touch.
+        {
+            const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            static bool startShown = false;
+            if (!startShown)
+            {
+                startShown = true;
+                state.touchShown = settings.touchControls;
+            }
+            static bool lastSetting = settings.touchControls;
+            if (settings.touchControls != lastSetting) // (just switched in Settings)
+            {
+                lastSetting = settings.touchControls;
+                state.touchShown = settings.touchControls;
+            }
+            if (state.touched || !state.fingers.empty())
+                state.lastTouchSeconds = now;
+            if (state.gamepadUsed)
+                state.touchShown = false;
+            else if (state.touched)
+                state.touchShown = true;
+            else if (!settings.touchControls && state.touchShown && state.fingers.empty() && now - state.lastTouchSeconds > 4.0)
+                state.touchShown = false;
+            touch.SetVisible(editing || state.touchShown);
+            touch.SetOverGame(!settings.touchControls && !editing); // (the picture stays put as they come and go)
+        }
         state.touched = false;
         if (emulator.RomName() != shownRom)
             shownRom = emulator.RomName();
@@ -599,7 +625,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             // without it the menu stayed on screen, frozen, over the editor)
             uint32_t noButtons[3] = {}, noLastButtons[3] = {};
             appMenu.Update(noButtons, noLastButtons, deltaSeconds);
-            const bool backTapped = state.backHeld && !backWasHeld;
+            const bool backTapped = state.backTapped || (state.backHeld && !backWasHeld);
+            state.backTapped = false;
             backWasHeld = state.backHeld;
             if (touch.UpdateEdit(touches) || backTapped)
             {
@@ -614,8 +641,10 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         std::memcpy(lastButtonStates, buttonStates, sizeof(buttonStates));
         buttonStates[ButtonMapper::DeviceGamepad] = state.gamepadKeyBits | state.gamepadAxisBits;
         buttonStates[ButtonMapper::DeviceLeftTouch] = 0;
+        const bool backTapped = state.backTapped || (state.backHeld && !backWasHeld);
+        state.backTapped = false;
         buttonStates[ButtonMapper::DeviceRightTouch] =
-            state.backHeld && appMenu.IsOpen() ? ButtonMapper::ButtonMapping[ButtonMapper::EmuButton_B] : 0;
+            (state.backHeld || backTapped) && appMenu.IsOpen() ? ButtonMapper::ButtonMapping[ButtonMapper::EmuButton_B] : 0;
         const bool menuWasOpen = appMenu.IsOpen();
         appMenu.Update(buttonStates, lastButtonStates, deltaSeconds);
 
@@ -627,7 +656,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         if (combo && !menuComboWasHeld)
             appMenu.ToggleOpen();
         menuComboWasHeld = combo;
-        if (state.backHeld && !backWasHeld && !menuWasOpen && !appMenu.IsOpen() && emulator.HasGame())
+        if (backTapped && !menuWasOpen && !appMenu.IsOpen() && emulator.HasGame())
             appMenu.Show();
         backWasHeld = state.backHeld;
 

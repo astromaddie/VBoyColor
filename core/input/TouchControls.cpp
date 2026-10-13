@@ -506,7 +506,7 @@ void TouchControls::ForgetGameLayout(Platform &platform, const std::string &game
 
 void TouchControls::ScreenArea(float &x, float &y, float &w, float &h) const
 {
-    if (m_visible)
+    if (m_visible && !m_overGame)
     {
         x = m_screenX;
         y = m_screenY;
