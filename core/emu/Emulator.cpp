@@ -23,6 +23,9 @@
 #include <unordered_map>
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <dlfcn.h>
+#include <sys/resource.h>
+#include <unistd.h>
 #endif
 
 namespace
@@ -258,8 +261,53 @@ void Emulator::StopWorker()
     m_worker.join();
 }
 
+#if defined(__ANDROID__)
+namespace
+{
+    // The emulation thread on a phone or headset: a higher priority (as a
+    // game's render thread), and - Android 13 and newer - a performance hint
+    // session telling the system it has 20 ms per frame, so the CPU's speed
+    // and cores follow what it needs instead of guessing (dlsym: older
+    // Androids don't have it).
+    struct PerfHint
+    {
+        void *session = nullptr;
+        void (*report)(void *, int64_t) = nullptr;
+
+        void Start()
+        {
+            setpriority(PRIO_PROCESS, 0, -8); // (THREAD_PRIORITY_URGENT_DISPLAY - this thread only)
+            void *lib = dlopen("libandroid.so", RTLD_NOW);
+            if (!lib)
+                return;
+            using GetManager = void *(*)();
+            using CreateSession = void *(*)(void *, const int32_t *, size_t, int64_t);
+            auto getManager = reinterpret_cast<GetManager>(dlsym(lib, "APerformanceHint_getManager"));
+            auto createSession = reinterpret_cast<CreateSession>(dlsym(lib, "APerformanceHint_createSession"));
+            report = reinterpret_cast<void (*)(void *, int64_t)>(dlsym(lib, "APerformanceHint_reportActualWorkDuration"));
+            if (!getManager || !createSession || !report)
+                return;
+            void *manager = getManager();
+            const int32_t tid = static_cast<int32_t>(gettid());
+            if (manager)
+                session = createSession(manager, &tid, 1, 20'000'000); // (a Virtual Boy frame: 1/50 s)
+            LogLine("[Emulator] Performance hints: %s", session ? "on" : "not available");
+        }
+        void Report(int64_t nanos) const
+        {
+            if (session && report && nanos > 0)
+                report(session, nanos);
+        }
+    };
+} // namespace
+#endif
+
 void Emulator::WorkerLoop()
 {
+#if defined(__ANDROID__)
+    PerfHint hint;
+    hint.Start();
+#endif
     for (;;)
     {
         int runs = 0;
@@ -279,7 +327,17 @@ void Emulator::WorkerLoop()
         if (thumbnail)
             ThumbnailStep();
         else
+        {
+#if defined(__ANDROID__)
+            const auto start = std::chrono::steady_clock::now();
+#endif
             RunCoreFrames(runs);
+#if defined(__ANDROID__)
+            // (per frame, as the session's target is)
+            hint.Report(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count() /
+                        std::max(1, runs));
+#endif
+        }
     }
 }
 
@@ -534,7 +592,33 @@ void Emulator::RunFrame(float deltaSeconds)
         return;
 
     const float framePeriod = 1.0f / kCoreFps;
-    m_frameAccumulator += deltaSeconds;
+    // An app frame's measured time wobbles a few milliseconds around the
+    // screen's refresh (when the loop got to run, not when its picture
+    // showed); added as it is, some refreshes ran two game frames and the
+    // next none - uneven motion, and the emulation thread catching up. So
+    // each refresh counts as the recent average, and the difference from the
+    // real time is paid back a tenth a refresh - the game's clock still
+    // follows the real one exactly, just smoothly (a refresh-rate change too:
+    // the average follows it). A long stall (a pause, the app in the
+    // background) counts as it is.
+    float step;
+    if (m_smoothDelta <= 0.0f || deltaSeconds > 0.25f)
+    {
+        m_smoothDelta = std::min(deltaSeconds, framePeriod);
+        m_timeDebt = 0.0f;
+        step = deltaSeconds;
+    }
+    else
+    {
+        m_smoothDelta += (deltaSeconds - m_smoothDelta) * 0.05f;
+        m_timeDebt += deltaSeconds - m_smoothDelta;
+        float payBack = m_timeDebt * 0.1f;
+        if (m_timeDebt > 0.1f || m_timeDebt < -0.1f)
+            payBack = m_timeDebt; // (far off: settle at once)
+        m_timeDebt -= payBack;
+        step = std::max(0.0f, m_smoothDelta + payBack);
+    }
+    m_frameAccumulator += step;
 
     // Cap catch-up so a debugger pause/hitch doesn't spin retro_run() an
     // enormous number of times on the next real frame.

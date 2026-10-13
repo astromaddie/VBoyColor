@@ -497,6 +497,8 @@ private:
     uint32_t m_romCrc = 0, m_romSize = 0; // the loaded ROM's CRC-32 and size (color packs are matched by them too)
     bool FindPackForRom(std::string &from); // a pack made for this ROM (by its CRC), built in or in the ROMs folder
 
+    float m_smoothDelta = 0.0f;      // (RunFrame's steady app-frame time...
+    float m_timeDebt = 0.0f;         // ... and the real time it hasn't counted yet)
     float m_frameAccumulator = 0.0f; // real time not yet consumed by retro_run() - see kCoreFps (render thread)
     float m_ramCheckSeconds = 0.0f;  // time since SRAM was last checked (render thread)
     // A movie (see LoadRom): its frames' input, the next one, and whether
