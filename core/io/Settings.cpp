@@ -51,6 +51,8 @@ namespace
             return offsetof(AppSettings, logWindow);
         case 24:
             return offsetof(AppSettings, touchControls);
+        case 25:
+            return offsetof(AppSettings, perfOverlay);
         default:
             return 0;
         }

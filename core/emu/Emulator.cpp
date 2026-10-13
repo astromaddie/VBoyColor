@@ -540,7 +540,11 @@ void Emulator::RunFrame(float deltaSeconds)
     // enormous number of times on the next real frame.
     const float kMaxCatchUp = framePeriod * 4.0f;
     if (m_frameAccumulator > kMaxCatchUp)
+    {
+        std::lock_guard<std::mutex> perf(m_perfMutex);
+        m_perf.dropped += static_cast<int>((m_frameAccumulator - kMaxCatchUp) / framePeriod);
         m_frameAccumulator = kMaxCatchUp;
+    }
 
     int runs = 0;
     while (m_frameAccumulator >= framePeriod)
@@ -553,6 +557,11 @@ void Emulator::RunFrame(float deltaSeconds)
         {
             std::lock_guard<std::mutex> lock(m_workMutex);
             // (the thread fell behind: drop frames rather than pile them up)
+            if (m_pendingRuns + runs > 4)
+            {
+                std::lock_guard<std::mutex> perf(m_perfMutex);
+                m_perf.dropped += m_pendingRuns + runs - 4;
+            }
             m_pendingRuns = std::min(m_pendingRuns + runs, 4);
         }
         m_workCv.notify_one();
@@ -606,6 +615,12 @@ void Emulator::RunCoreFrames(int runs)
         m_emulationMs += ms;
         m_emulationMaxMs = std::max(m_emulationMaxMs, ms);
         ++m_timedFrames;
+        {
+            std::lock_guard<std::mutex> perf(m_perfMutex);
+            ++m_perf.frames;
+            m_perf.emulationMs += ms;
+            m_perf.emulationMaxMs = std::max(m_perf.emulationMaxMs, ms);
+        }
         // Recording: every emulated frame, not just the last one an app
         // frame shows.
         if (m_recorder.Active() && g_frameReady && i + 1 < runs)
@@ -615,7 +630,11 @@ void Emulator::RunCoreFrames(int runs)
         }
     }
     if (runs > 1)
+    {
         ++m_catchUps;
+        std::lock_guard<std::mutex> perf(m_perfMutex);
+        ++m_perf.catchUps;
+    }
 
     if (g_frameReady)
     {
@@ -671,6 +690,14 @@ void Emulator::PublishFrame()
     m_displayWidth = m_lastFrameWidth;
     m_displayHeight = height;
     m_displayNew = true;
+}
+
+Emulator::PerfStats Emulator::TakePerfStats()
+{
+    std::lock_guard<std::mutex> perf(m_perfMutex);
+    const PerfStats taken = m_perf;
+    m_perf = PerfStats{};
+    return taken;
 }
 
 void Emulator::UploadDisplay()
@@ -865,6 +892,12 @@ void Emulator::ColorFrame()
         m_coloringMs += ms;
         m_coloringMaxMs = std::max(m_coloringMaxMs, ms);
         ++m_coloringFrames;
+        {
+            std::lock_guard<std::mutex> perf(m_perfMutex);
+            ++m_perf.coloredFrames;
+            m_perf.coloringMs += ms;
+            m_perf.coloringMaxMs = std::max(m_perf.coloringMaxMs, ms);
+        }
     }
     if (m_tileDebugView)
         PaintTileDebugView();

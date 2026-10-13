@@ -794,6 +794,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             if (appMenu.NoticeShowing()) // (an achievement unlocked, over the game)
                 appMenu.Draw(uiRenderer, menuX, menuY);
         }
+        // (Settings > Troubleshooting > Performance overlay)
+        appMenu.DrawPerfOverlay(uiRenderer, 8.0f * menuScale, 8.0f * menuScale, menuScale);
         uiRenderer.EndFrame();
 
         VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};

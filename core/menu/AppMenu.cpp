@@ -749,6 +749,8 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
     for (int device = 0; device < 3; ++device)
         m_suppressedMenuButtons[device] &= buttonStates[device];
 
+    UpdatePerf(deltaSeconds);
+
     // Animate the open/close fade regardless of m_open, so Hide() eases the
     // panel out instead of popping it away the instant gameplay input
     // resumes (see IsOpen() vs IsVisible()'s doc comment).
@@ -1375,6 +1377,87 @@ void AppMenu::ShowNotice(const std::string &caption, const std::string &title, c
     m_appNotices.erase(std::remove_if(m_appNotices.begin(), m_appNotices.end(), [](const AppNotice &n) { return n.replaceable; }),
                        m_appNotices.end());
     m_appNotices.push_back({std::move(notice), icon == UiIconId::None ? UiIconId::Header : icon, true});
+}
+
+// -----------------------------------------------------------------------
+// Performance overlay
+
+bool AppMenu::PerfOverlayOn() const { return m_resources.settings && m_resources.settings->perfOverlay; }
+
+void AppMenu::UpdatePerf(float deltaSeconds)
+{
+    Perf &p = m_perf;
+    if (!PerfOverlayOn())
+    {
+        if (!p.lines.empty())
+            p = Perf{};
+        return;
+    }
+    const float ms = deltaSeconds * 1000.0f;
+    // (a frame "late": half again as long as the steady ones - a refresh missed)
+    if (p.smoothMs <= 0.0f)
+        p.smoothMs = ms;
+    if (ms > p.smoothMs * 1.5f)
+        ++p.late;
+    else
+        p.smoothMs = p.smoothMs * 0.95f + ms * 0.05f;
+    ++p.frames;
+    p.seconds += deltaSeconds;
+    p.maxMs = std::max(p.maxMs, ms);
+    if (m_resources.emulator && m_resources.emulator->ScreenVersion() != p.lastScreenVersion)
+    {
+        p.lastScreenVersion = m_resources.emulator->ScreenVersion();
+        ++p.gameFrames;
+    }
+    if (p.seconds < 1.0f)
+        return;
+
+    char line[160];
+    p.lines.clear();
+    std::snprintf(line, sizeof(line), "Screen %.1f fps  %.1f ms (max %.1f)  late %d", p.frames / p.seconds,
+                  p.seconds * 1000.0f / p.frames, p.maxMs, p.late);
+    p.lines.push_back(line);
+    const bool game = m_resources.emulator && m_resources.emulator->HasGame();
+    Emulator::PerfStats e = m_resources.emulator ? m_resources.emulator->TakePerfStats() : Emulator::PerfStats{};
+    if (game)
+    {
+        std::snprintf(line, sizeof(line), "Game %.1f fps shown, %.1f emulated", p.gameFrames / p.seconds, e.frames / p.seconds);
+        p.lines.push_back(line);
+        std::snprintf(line, sizeof(line), "Emulation %.1f ms (max %.1f)  colors %.1f ms (max %.1f)",
+                      e.frames ? e.emulationMs / e.frames : 0.0, e.emulationMaxMs,
+                      e.coloredFrames ? e.coloringMs / e.coloredFrames : 0.0, e.coloringMaxMs);
+        p.lines.push_back(line);
+        std::snprintf(line, sizeof(line), "Catch-ups %d  dropped %d", e.catchUps, e.dropped);
+        p.lines.push_back(line);
+    }
+    else
+        p.lines.push_back("No game running");
+    std::string joined;
+    for (const std::string &l : p.lines)
+        joined += (joined.empty() ? "" : " | ") + l;
+    LogLine("[Perf] %s", joined.c_str());
+    p.frames = p.late = p.gameFrames = 0;
+    p.seconds = p.maxMs = 0.0f;
+}
+
+void AppMenu::DrawPerfOverlay(UiRenderer &ui, float x, float y, float scale)
+{
+    if (!PerfOverlayOn() || m_perf.lines.empty())
+        return;
+    const UiFontHandle font = m_resources.captionBoldFont;
+    const float line = 9.0f * scale, pad = 4.0f * scale;
+    float w = 0.0f;
+    for (const std::string &l : m_perf.lines)
+        w = std::max(w, ui.GetTextWidth(font, l) * scale);
+    const float h = line * m_perf.lines.size() + pad * 2.0f;
+    ui.DrawQuadRounded(x, y, w + pad * 2.0f, h, {0.0f, 0.0f, 0.0f, 0.7f}, 4.0f * scale);
+    float ty = y + pad;
+    for (const std::string &l : m_perf.lines)
+    {
+        const float textY = ty + line / 2.0f - (ui.GetFontPHeight(font) / 2.0f + ui.GetFontPStart(font)) * scale;
+        ui.DrawText(font, l, x + pad, textY, scale, {0.6f, 1.0f, 0.6f, 1.0f});
+        ty += line;
+    }
 }
 
 // -----------------------------------------------------------------------

@@ -1007,6 +1007,8 @@ int main(int argc, char **argv)
                 for (int i = 0; i < paneCount; ++i)
                     appMenu.Draw(uiRenderer, panes[i].ox + menuX * panes[i].qx, panes[i].oy + menuY * panes[i].qy, panes[i].qx,
                                  panes[i].qy);
+            // (Settings > Troubleshooting > Performance overlay)
+            appMenu.DrawPerfOverlay(uiRenderer, 8.0f * menuScale, 8.0f * menuScale, menuScale);
             uiRenderer.EndFrame();
 
             VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
