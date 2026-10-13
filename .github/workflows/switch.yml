@@ -33,6 +33,9 @@ jobs:
   switch:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Tools
         run: |
