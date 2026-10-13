@@ -17,7 +17,7 @@ namespace
     constexpr float kGame = 190.0f;
     constexpr float kGroundY = 152.0f; // the ground's top
     constexpr float kHillY = 128.0f;   // where Nucita walks, far away
-    constexpr float kYunoX = 26.0f;
+    constexpr float kYunoX = 20.0f;   // (his sprite's left: the tail - his body from +11 to +34)
     constexpr float kGravity = 1150.0f, kJumpSpeed = 310.0f;
     constexpr float kTileW = 24.0f, kEdgeW = 15.0f;
 
@@ -150,9 +150,9 @@ void SupportPage::BuildAtlas(UiRenderer &ui)
     m_atlas = ui.CreateStreamingImage(kAtlasW, static_cast<uint32_t>(atlasH), VK_FORMAT_B8G8R8A8_SRGB);
     ui.UpdateStreamingImage(m_atlas, bgra.data(), bgra.size());
 
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 6; ++i)
         m_sRun[i] = SpriteIndex(("yunoRun" + std::to_string(i)).c_str());
-    m_sJump = SpriteIndex("yunoJump");
+    m_sJump = m_sRun[0]; // (the leap, legs stretched out)
     m_sSit = SpriteIndex("yunoSit");
     m_sGround = SpriteIndex("ground");
     m_sFill = SpriteIndex("fill");
@@ -471,7 +471,7 @@ void SupportPage::StepGame(float dt)
     m_animTime += dt;
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
-    // The clouds drift (a little faster while she runs).
+    // The clouds drift (a little faster while he runs).
     const float cloudSpeed = 4.0f + (m_state == State::Running ? m_speed * 0.15f : 0.0f);
     if (m_state != State::GameOver && m_state != State::Falling)
     {
@@ -516,7 +516,7 @@ void SupportPage::StepGame(float dt)
     // Over a gap? (both feet over it)
     auto overGap = [this]()
     {
-        const float footL = m_scroll + kYunoX + 9.0f, footR = m_scroll + kYunoX + 23.0f;
+        const float footL = m_scroll + kYunoX + 14.0f, footR = m_scroll + kYunoX + 30.0f;
         for (const Piece &p : m_pieces)
             if (p.kind == PieceKind::Gap && footL >= p.x - 2.0f && footR <= p.x + p.w + 2.0f)
                 return true;
@@ -549,7 +549,7 @@ void SupportPage::StepGame(float dt)
     }
 
     // Bumped into something?
-    const float yx0 = m_scroll + kYunoX + 5.0f, yx1 = m_scroll + kYunoX + 27.0f;
+    const float yx0 = m_scroll + kYunoX + 11.0f, yx1 = m_scroll + kYunoX + 34.0f;
     const float yy0 = m_yunoY - 19.0f, yy1 = m_yunoY - 1.0f;
     for (const Obstacle &o : m_obstacles)
     {
@@ -636,7 +636,7 @@ void SupportPage::Layout(UiRenderer &ui)
     m_gameSize = std::floor(kContentBottom - m_gameY);
     m_gameX = kContentRight - m_gameSize;
     const float sideW = m_gameX - kContentX - 10.0f;
-    m_sideLines = Wrap(ui, body, "A little thank-you for stopping by: help my cat Yuno run as far as she can.",
+    m_sideLines = Wrap(ui, body, "A little thank-you for stopping by: help my cat Yuno run as far as he can.",
                        sideW);
     if (m_profile == ButtonMappingProfile::Phone)
     {
@@ -807,10 +807,9 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
 
     if (m_state == State::Title)
     {
-        // Yuno and Nucita, sitting.
-        DrawSprite(ui, m_sSit, 52.0f, kGroundY - m_sprites[m_sSit].h + 1.0f, ox, oy, alpha);
-        const int nucita = std::fmod(m_titleTime, 3.1f) > 2.95f ? m_sNucitaBlink : m_sNucitaSit;
-        DrawSprite(ui, nucita, 110.0f, kGroundY - m_sprites[nucita].h + 1.0f, ox, oy, alpha, 0.85f);
+        // Yuno, sitting in the middle.
+        DrawSprite(ui, m_sSit, std::round((kGame - m_sprites[m_sSit].w) / 2.0f), kGroundY - m_sprites[m_sSit].h + 1.0f, ox, oy,
+                   alpha);
         center(bold, "YUNO'S ADVENTURE", 22.0f, kRed);
         const int best = m_settings ? m_settings->yunoBest : 0;
         if (best > 0)
@@ -822,7 +821,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
     {
         // Yuno.
         const bool air = !m_onGround || m_state == State::Falling;
-        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_animTime * (6.0f + m_speed / 30.0f)) % 3];
+        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_animTime * (8.0f + m_speed / 18.0f)) % 6];
         const int shown = m_state == State::GameOver && m_yunoY > kGame ? -1 : frame;
         if (shown >= 0)
             DrawSprite(ui, shown, kYunoX, std::round(m_yunoY) - m_sprites[shown].h + 1.0f, ox, oy, alpha);

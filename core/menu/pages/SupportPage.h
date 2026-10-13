@@ -13,8 +13,8 @@ class Emulator;
 // Support (the sidebar, above Quit): a few words from Juan and a "Buy me a
 // coffee" button (his GitHub Sponsors page, one time) - and under it Yuno's
 // Adventure, a little endless runner in the Virtual Boy's reds starring his
-// cat Yuno (her sister Nucita watches from the hills). Jump over rocks,
-// bushes and gaps: A (any face button on a gamepad, Space or Enter on a
+// cat Yuno (his sister Nucita shows up on the far hills now and then). Jump
+// over rocks, bushes and gaps: A (any face button on a gamepad, Space or Enter on a
 // keyboard), a click or a tap on the game, or the trigger pointing at it.
 // The arrows still move out of it - and leaving the game (or the page, or
 // the menu) ends the run. The best score is kept (AppSettings::yunoBest).
@@ -127,7 +127,7 @@ private:
     // The pictures (YunoSprites.h), in one texture.
     UiImageHandle m_atlas;
     std::vector<Sprite> m_sprites;
-    int m_sRun[3]{}, m_sJump = 0, m_sSit = 0, m_sGround = 0, m_sFill = 0, m_sEdgeL = 0, m_sEdgeR = 0;
+    int m_sRun[6]{}, m_sJump = 0, m_sSit = 0, m_sGround = 0, m_sFill = 0, m_sEdgeL = 0, m_sEdgeR = 0;
     int m_sNucitaSit = 0, m_sNucitaBlink = 0, m_sNucitaWalk[4]{}, m_sNucitaHop[2]{};
     std::vector<int> m_obstacleSprites, m_cloudSprites;
 
@@ -140,7 +140,7 @@ private:
     float m_speed = 0;    // game pixels a second
     float m_distance = 0; // (the score: a tenth of it)
     float m_runTime = 0;
-    float m_yunoY = 0, m_yunoVy = 0; // her feet, game pixels from the top
+    float m_yunoY = 0, m_yunoVy = 0; // his feet, game pixels from the top
     bool m_onGround = true;
     float m_jumpBuffer = 0; // (a jump pressed just before landing still counts)
     float m_animTime = 0;
