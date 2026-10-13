@@ -205,9 +205,9 @@ struct AppSettings
     // Controls > Touch controls) - off, it's a gamepad (and Back for the menu).
     bool touchControls = true;
 
-    // Version 26 (appended): Settings > Troubleshooting > Performance overlay
-    // (AppMenu::DrawPerfOverlay).
-    bool perfOverlay = false;
+    // Version 26 (appended): a development builds' performance overlay, since
+    // removed - kept so the layout (and a version 26 file) stays as it was.
+    bool unused26 = false;
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

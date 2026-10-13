@@ -46,10 +46,6 @@
 
 namespace
 {
-    // Where a screen refresh's time goes (logged every 5 seconds, beside the
-    // emulator's frame times): the app's work (input, menu, handing the game
-    // its time), waiting for a picture to draw into, recording the drawing,
-    // the GPU drawing it (EndFrame waits for it) and handing it to the screen.
     // Android 11+: tells the system this window shows a 50 fps game (0: no
     // preference), so a phone with a 50, 100 or 60 Hz mode can use it instead
     // of redrawing the same game frame at 90 or 120 Hz - less GPU work, and
@@ -60,55 +56,12 @@ namespace
         static const SetFrameRate setFrameRate = []() -> SetFrameRate
         {
             void *lib = dlopen("libandroid.so", RTLD_NOW);
-            auto found = lib ? reinterpret_cast<SetFrameRate>(dlsym(lib, "ANativeWindow_setFrameRate")) : nullptr;
-            if (!found)
-                LOGI("[Phone] Frame rate hint: not available (Android 10)");
-            return found;
+            return lib ? reinterpret_cast<SetFrameRate>(dlsym(lib, "ANativeWindow_setFrameRate")) : nullptr;
         }();
         if (!window || !setFrameRate)
             return;
-        const int32_t result = setFrameRate(window, fps, 1 /* ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE */);
-        LOGI("[Phone] Frame rate hint: %s (%d)", fps > 0.0f ? "50 fps game" : "none", static_cast<int>(result));
+        setFrameRate(window, fps, 1 /* ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE */);
     }
-
-    struct RefreshTimes
-    {
-        enum Part
-        {
-            Work,
-            Acquire,
-            Record,
-            Gpu,
-            Present,
-            Parts
-        };
-        double sum[Parts] = {}, most[Parts] = {};
-        int count = 0;
-        std::chrono::steady_clock::time_point mark, since = std::chrono::steady_clock::now();
-
-        void Start(std::chrono::steady_clock::time_point now) { mark = now; }
-        void Lap(Part part)
-        {
-            const auto now = std::chrono::steady_clock::now();
-            const double ms = std::chrono::duration<double, std::milli>(now - mark).count();
-            sum[part] += ms;
-            most[part] = std::max(most[part], ms);
-            mark = now;
-        }
-        void Done()
-        {
-            ++count;
-            const double seconds = std::chrono::duration<double>(mark - since).count();
-            if (seconds < 5.0)
-                return;
-            LOGI("[Phone] A refresh (%d in %.1f s): app %.1f ms (%.1f at most), waiting for an image %.1f (%.1f), "
-                 "recording %.1f (%.1f), GPU %.1f (%.1f), presenting %.1f (%.1f)",
-                 count, seconds, sum[Work] / count, most[Work], sum[Acquire] / count, most[Acquire], sum[Record] / count,
-                 most[Record], sum[Gpu] / count, most[Gpu], sum[Present] / count, most[Present]);
-            *this = RefreshTimes();
-            since = mark = std::chrono::steady_clock::now();
-        }
-    };
 } // namespace
 
 namespace
@@ -436,9 +389,6 @@ namespace
             vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
             images.resize(count);
             vkGetSwapchainImagesKHR(device, swapchain, &count, images.data());
-            LOGI("[Phone] Swapchain %ux%u, %u images (asked %u), screen turn %d (drawn unturned: %s)", extent.width, extent.height,
-                 count, info.minImageCount, static_cast<int>(caps.currentTransform),
-                 caps.currentTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR ? "no turn needed" : "the system turns it");
         }
 
         void Destroy(UiRenderer &ui)
@@ -512,7 +462,6 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     std::string shownRom;
     auto lastFrameTime = std::chrono::steady_clock::now();
     bool fatal = false;
-    RefreshTimes refreshTimes;
     float hintedFps = -1.0f;
     ANativeWindow *hintedWindow = nullptr;
 
@@ -621,7 +570,6 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         const auto now = std::chrono::steady_clock::now();
         const float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
         lastFrameTime = now;
-        refreshTimes.Start(now);
 
         const float w = static_cast<float>(presenter.extent.width), h = static_cast<float>(presenter.extent.height);
         const int32_t density = AConfiguration_getDensity(app->config);
@@ -793,7 +741,6 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         emulator.PrepareScreen(uiRenderer, presenter.format.format, settings.ScreenTint(), settings.ScreenPattern(),
                                settings.screenLook, anaglyph);
 
-        refreshTimes.Lap(RefreshTimes::Work);
         vkResetFences(renderer.GetDevice(), 1, &acquireFence);
         uint32_t imageIndex = 0;
         const VkResult acquired = vkAcquireNextImageKHR(renderer.GetDevice(), presenter.swapchain, UINT64_MAX, VK_NULL_HANDLE,
@@ -813,7 +760,6 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         if (acquired != VK_SUCCESS && acquired != VK_SUBOPTIMAL_KHR)
             CheckVk(acquired, "vkAcquireNextImageKHR");
         vkWaitForFences(renderer.GetDevice(), 1, &acquireFence, VK_TRUE, UINT64_MAX);
-        refreshTimes.Lap(RefreshTimes::Acquire);
 
         uiRenderer.BeginFrame(presenter.images[imageIndex], presenter.format.format, presenter.extent.width,
                               presenter.extent.height, appMenu.GetBackgroundColor());
@@ -880,11 +826,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
             if (appMenu.NoticeShowing()) // (an achievement unlocked, over the game)
                 appMenu.Draw(uiRenderer, menuX, menuY);
         }
-        // (Settings > Troubleshooting > Performance overlay)
-        appMenu.DrawPerfOverlay(uiRenderer, 8.0f * menuScale, 8.0f * menuScale, menuScale);
-        refreshTimes.Lap(RefreshTimes::Record);
         uiRenderer.EndFrame();
-        refreshTimes.Lap(RefreshTimes::Gpu);
 
         VkPresentInfoKHR presentInfo{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
         presentInfo.swapchainCount = 1;
@@ -895,8 +837,6 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         // turns it - and a new swapchain each frame dropped every picture
         // before it was shown: a black screen. A new size is caught above.)
         const VkResult presented = vkQueuePresentKHR(renderer.GetQueue(), &presentInfo);
-        refreshTimes.Lap(RefreshTimes::Present);
-        refreshTimes.Done();
         if (presented == VK_ERROR_OUT_OF_DATE_KHR)
             presenter.CreateSwapchain(uiRenderer, state.window);
       }

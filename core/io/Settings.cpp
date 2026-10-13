@@ -52,7 +52,7 @@ namespace
         case 24:
             return offsetof(AppSettings, touchControls);
         case 25:
-            return offsetof(AppSettings, perfOverlay);
+            return offsetof(AppSettings, unused26);
         default:
             return 0;
         }

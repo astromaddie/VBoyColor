@@ -1,6 +1,6 @@
 @echo off
 rem VBoy Color - install a build on an Android phone (or Quest) over USB and
-rem watch its log, for checking lag and skipped frames.
+rem watch its log (a crash, a game that won't load, ...).
 rem
 rem   1. Put this file next to the APK (VBoyColor-...-quest-android-arm64.apk -
 rem      the newest one in the folder is used), or drag an APK onto it.
@@ -9,11 +9,6 @@ rem      "Build number" 7 times, then Developer options > USB debugging),
 rem      connect it and allow the computer when it asks.
 rem   3. Run this. It installs (keeping your games and settings), starts the
 rem      app and shows its log - also saved as vboycolor-log.txt here.
-rem
-rem In a development build (dev.N, from GitHub Actions), turn on Settings >
-rem Troubleshooting > Performance overlay: once a second the log then gets a
-rem "[Perf]" line - screen fps, late frames, the game's frames, emulation and
-rem coloring times, catch-ups and dropped frames. Ctrl+C stops the log.
 
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -67,7 +62,6 @@ echo Starting VBoy Color...
 
 echo.
 echo VBoy Color's log (also in vboycolor-log.txt) - Ctrl+C to stop.
-echo For lag: Settings ^> Troubleshooting ^> Performance overlay ([Perf] lines).
 echo.
 powershell -NoProfile -Command "& '%ADB%' logcat -v time -s VBoyColor:V | Tee-Object -FilePath 'vboycolor-log.txt'"
 pause

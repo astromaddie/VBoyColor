@@ -24,7 +24,6 @@
 #ifdef __ANDROID__
 #include <android/log.h>
 #include <dlfcn.h>
-#include <sched.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
@@ -268,38 +267,6 @@ void Emulator::StopWorker()
 #if defined(__ANDROID__)
 namespace
 {
-    // A CPU core's clock (kHz) - "scaling_cur_freq" now, "cpuinfo_max_freq" at
-    // most; 0 if the phone doesn't say.
-    int CpuKhz(int cpu, const char *file)
-    {
-        char path[96];
-        std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/%s", cpu, file);
-        FILE *f = std::fopen(path, "r");
-        if (!f)
-            return 0;
-        int khz = 0;
-        if (std::fscanf(f, "%d", &khz) != 1)
-            khz = 0;
-        std::fclose(f);
-        return khz;
-    }
-
-    // The phone's cores and their top speeds (big and little ones), once.
-    void LogCpuCores()
-    {
-        std::string line;
-        char part[32];
-        for (int cpu = 0; cpu < 16; ++cpu)
-        {
-            const int khz = CpuKhz(cpu, "cpuinfo_max_freq");
-            if (khz <= 0)
-                continue;
-            std::snprintf(part, sizeof(part), " %d:%.2f", cpu, khz / 1e6);
-            line += part;
-        }
-        LogLine("[Emulator] CPU cores (top GHz):%s", line.empty() ? " not readable" : line.c_str());
-    }
-
     // The emulation thread on a phone or headset: a higher priority (as a
     // game's render thread), and - Android 13 and newer - a performance hint
     // session telling the system it has 20 ms per frame, so the CPU's speed
@@ -312,7 +279,6 @@ namespace
 
         void Start()
         {
-            LogCpuCores();
             setpriority(PRIO_PROCESS, 0, -8); // (THREAD_PRIORITY_URGENT_DISPLAY - this thread only)
             void *lib = dlopen("libandroid.so", RTLD_NOW);
             if (!lib)
@@ -328,7 +294,6 @@ namespace
             const int32_t tid = static_cast<int32_t>(gettid());
             if (manager)
                 session = createSession(manager, &tid, 1, 20'000'000); // (a Virtual Boy frame: 1/50 s)
-            LogLine("[Emulator] Performance hints: %s", session ? "on" : "not available");
         }
         void Report(int64_t nanos) const
         {
@@ -656,22 +621,12 @@ void Emulator::RunFrame(float deltaSeconds)
         step = std::max(0.0f, m_smoothDelta + payBack);
     }
     m_frameAccumulator += step;
-    ++m_refreshes;
-    if (deltaSeconds > m_smoothDelta * 1.5f)
-        ++m_lateRefreshes;
-    const int deltaUs = static_cast<int>(deltaSeconds * 1e6f);
-    if (deltaUs > m_longestRefreshUs.load(std::memory_order_relaxed))
-        m_longestRefreshUs.store(deltaUs, std::memory_order_relaxed);
 
     // Cap catch-up so a debugger pause/hitch doesn't spin retro_run() an
     // enormous number of times on the next real frame.
     const float kMaxCatchUp = framePeriod * 4.0f;
     if (m_frameAccumulator > kMaxCatchUp)
-    {
-        std::lock_guard<std::mutex> perf(m_perfMutex);
-        m_perf.dropped += static_cast<int>((m_frameAccumulator - kMaxCatchUp) / framePeriod);
         m_frameAccumulator = kMaxCatchUp;
-    }
 
     int runs = 0;
     while (m_frameAccumulator >= framePeriod)
@@ -679,18 +634,11 @@ void Emulator::RunFrame(float deltaSeconds)
         m_frameAccumulator -= framePeriod;
         ++runs;
     }
-    if (runs > 1)
-        ++m_doubleRuns;
     if (runs > 0)
     {
         {
             std::lock_guard<std::mutex> lock(m_workMutex);
             // (the thread fell behind: drop frames rather than pile them up)
-            if (m_pendingRuns + runs > 4)
-            {
-                std::lock_guard<std::mutex> perf(m_perfMutex);
-                m_perf.dropped += m_pendingRuns + runs - 4;
-            }
             m_pendingRuns = std::min(m_pendingRuns + runs, 4);
         }
         m_workCv.notify_one();
@@ -735,31 +683,10 @@ void Emulator::RunCoreFrames(int runs)
                 StopMovie();
             }
         }
-        const auto runStart = std::chrono::steady_clock::now();
         retro_run();
-        const auto runEnd = std::chrono::steady_clock::now();
         // RetroAchievements: this frame's memory against the achievements (a
         // movie's run plays without them - see Achievements::GameLoaded).
         m_achievements.DoFrame();
-        const auto checkEnd = std::chrono::steady_clock::now();
-        const double checkMs = std::chrono::duration<double, std::milli>(checkEnd - runEnd).count();
-        m_achievementsMs += checkMs;
-        m_achievementsMaxMs = std::max(m_achievementsMaxMs, checkMs);
-#if defined(__ANDROID__)
-        const int cpu = sched_getcpu();
-        if (cpu >= 0 && cpu < 16)
-            ++m_cpuFrames[cpu];
-#endif
-        const double ms = std::chrono::duration<double, std::milli>(checkEnd - runStart).count();
-        m_emulationMs += ms;
-        m_emulationMaxMs = std::max(m_emulationMaxMs, ms);
-        ++m_timedFrames;
-        {
-            std::lock_guard<std::mutex> perf(m_perfMutex);
-            ++m_perf.frames;
-            m_perf.emulationMs += ms;
-            m_perf.emulationMaxMs = std::max(m_perf.emulationMaxMs, ms);
-        }
         // Recording: every emulated frame, not just the last one an app
         // frame shows.
         if (m_recorder.Active() && g_frameReady && i + 1 < runs)
@@ -768,64 +695,11 @@ void Emulator::RunCoreFrames(int runs)
             RecordFrame();
         }
     }
-    if (runs > 1)
-    {
-        ++m_catchUps;
-        std::lock_guard<std::mutex> perf(m_perfMutex);
-        ++m_perf.catchUps;
-    }
-
     if (g_frameReady)
     {
         PresentFrame();
         if (m_recorder.Active())
             RecordFrame();
-    }
-
-    // Frame times, logged every few seconds - to check them on the headset
-    // (logcat: VBoyColor). Both run on the emulation thread, once per
-    // emulated frame (50 a second); "behind" counts the times it had to run
-    // the core more than once to catch up (it fell behind).
-    if (m_timedFrames >= 250)
-    {
-        // (an unoptimized build's times say little about an optimized one's)
-#if defined(__OPTIMIZE__) || (defined(_MSC_VER) && defined(NDEBUG))
-        const char *build = "";
-#else
-        const char *build = " - unoptimized build: build Release to measure";
-#endif
-        char coloring[96] = "no coloring";
-        if (m_coloringFrames > 0)
-            std::snprintf(coloring, sizeof(coloring), "coloring both eyes %.2f ms (%.2f at most)",
-                          m_coloringMs / m_coloringFrames, m_coloringMaxMs);
-        LogLine("[Emulator] A frame: emulation %.2f ms on average (%.2f at most; achievements %.2f, %.2f at most), %s - last %d frames, behind %d times%s",
-                m_emulationMs / m_timedFrames, m_emulationMaxMs, m_achievementsMs / m_timedFrames, m_achievementsMaxMs,
-                coloring, m_timedFrames, m_catchUps, build);
-        // The app's side: a late screen refresh sends two game frames at once
-        // too (a stutter that isn't the emulation's).
-        LogLine("[Emulator]   screen: %d refreshes, %d late (the longest %.1f ms), %d sent two game frames at once",
-                m_refreshes.exchange(0), m_lateRefreshes.exchange(0), m_longestRefreshUs.exchange(0) / 1000.0,
-                m_doubleRuns.exchange(0));
-#if defined(__ANDROID__)
-        // Which cores ran it, and how fast each is going now (of its top
-        // speed): a slow (little) core, or a big one slowed down to cool off.
-        std::string cores;
-        for (int cpu = 0; cpu < 16; ++cpu)
-        {
-            if (m_cpuFrames[cpu] * 20 < m_timedFrames) // (under 5%)
-                continue;
-            char part[80];
-            std::snprintf(part, sizeof(part), "%s%d (%d%%, %.2f of %.2f GHz)", cores.empty() ? "" : ", ", cpu,
-                          m_cpuFrames[cpu] * 100 / m_timedFrames, CpuKhz(cpu, "scaling_cur_freq") / 1e6,
-                          CpuKhz(cpu, "cpuinfo_max_freq") / 1e6);
-            cores += part;
-        }
-        LogLine("[Emulator]   on CPU core %s", cores.c_str());
-        std::memset(m_cpuFrames, 0, sizeof(m_cpuFrames));
-#endif
-        m_emulationMs = m_emulationMaxMs = m_coloringMs = m_coloringMaxMs = 0.0;
-        m_achievementsMs = m_achievementsMaxMs = 0.0;
-        m_timedFrames = m_coloringFrames = m_catchUps = 0;
     }
 }
 
@@ -853,14 +727,6 @@ void Emulator::PublishFrame()
     m_displayWidth = m_lastFrameWidth;
     m_displayHeight = height;
     m_displayNew = true;
-}
-
-Emulator::PerfStats Emulator::TakePerfStats()
-{
-    std::lock_guard<std::mutex> perf(m_perfMutex);
-    const PerfStats taken = m_perf;
-    m_perf = PerfStats{};
-    return taken;
 }
 
 void Emulator::UploadDisplay()
@@ -1019,7 +885,6 @@ void Emulator::ColorFrame()
 {
     // Only the part of the core's (bigger, fixed-size) buffer this frame
     // uses - both eyes side by side - is converted and uploaded.
-    const auto coloringStart = std::chrono::steady_clock::now();
     const uint32_t width = std::min<uint32_t>(m_lastFrameWidth, kFbWidth);
     const uint32_t height = std::min<uint32_t>(m_lastFrameHeight, kFbHeight);
     const size_t stride = static_cast<size_t>(kFbWidth) * 4;
@@ -1049,18 +914,6 @@ void Emulator::ColorFrame()
         const uint32_t eyeOffset[2] = {0, m_lastFrameWidth - VBGO_TT_WIDTH};
         m_packRenderer.SetPackShown(packShown);
         m_packRenderer.Paint(m_frameBufferRgba.data(), m_rawFrame.data(), kFbWidth, eyeOffset, m_shadeBackground);
-        // How long coloring both eyes takes (colorize + paint) - logged with
-        // the emulation's time (see RunFrame).
-        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - coloringStart).count();
-        m_coloringMs += ms;
-        m_coloringMaxMs = std::max(m_coloringMaxMs, ms);
-        ++m_coloringFrames;
-        {
-            std::lock_guard<std::mutex> perf(m_perfMutex);
-            ++m_perf.coloredFrames;
-            m_perf.coloringMs += ms;
-            m_perf.coloringMaxMs = std::max(m_perf.coloringMaxMs, ms);
-        }
     }
     if (m_tileDebugView)
         PaintTileDebugView();

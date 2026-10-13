@@ -200,15 +200,6 @@ public:
     void ShowNotice(const std::string &caption, const std::string &title, const std::string &text, UiIconId icon,
                     float seconds = 2.5f);
 
-    // Settings > Troubleshooting > Performance overlay: a few lines over the
-    // game - the screen's frame rate and frame times (and how many came
-    // late), the game's frames shown, the emulation's and coloring's time,
-    // catch-ups and dropped frames - refreshed every second (and logged).
-    // Platforms draw it last in their frame (in screen pixels, scale: the
-    // menu's text size).
-    bool PerfOverlayOn() const;
-    void DrawPerfOverlay(UiRenderer &ui, float x, float y, float scale);
-
 private:
     class Sidebar;
     struct Logo
@@ -345,16 +336,6 @@ private:
     };
     std::deque<AppNotice> m_appNotices;
     bool m_noticeQuickIn = false;
-    // The performance overlay's numbers (see DrawPerfOverlay).
-    void UpdatePerf(float deltaSeconds);
-    struct Perf
-    {
-        int frames = 0, late = 0;
-        float seconds = 0, maxMs = 0, smoothMs = 0;
-        uint64_t lastScreenVersion = 0;
-        int gameFrames = 0;
-        std::vector<std::string> lines;
-    } m_perf; // (one replaced another: shown without sliding in again)
     UiImageHandle m_noticeTexture;
     float m_menuScale = kMenuScale; // see SetMenuScale
     std::string m_versionLine1, m_versionLine2;

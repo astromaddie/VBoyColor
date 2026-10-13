@@ -134,16 +134,6 @@ public:
     // core emptied, the screen black - the library with nothing running.
     // False when no ROM is loaded.
     bool CloseGame();
-    // Settings > Troubleshooting > Performance overlay: what the emulation did
-    // since the last call - emulated frames, their time (the core's, and
-    // coloring both eyes), how often it had to run more than one frame to
-    // catch up, and frames it had to drop.
-    struct PerfStats
-    {
-        int frames = 0, coloredFrames = 0, catchUps = 0, dropped = 0;
-        double emulationMs = 0.0, emulationMaxMs = 0.0, coloringMs = 0.0, coloringMaxMs = 0.0;
-    };
-    PerfStats TakePerfStats();
     // A short sound of the menu's own (the Support page's game), straight to
     // the audio output - interleaved stereo 16-bit at AudioOutput::kSampleRate.
     // Only while the game is paused (the menu open): the core pushes its own
@@ -571,18 +561,6 @@ private:
     TileColorPack m_colorPack;    // see ReloadColorPack
     ColorPackRenderer m_packRenderer;
     bool m_trackingWanted = false; // see SetTileTracking
-    // Time per emulated frame (see RunFrame): the core's, and coloring both
-    // eyes' (ColorFrame) - summed / worst since the last log line.
-    double m_emulationMs = 0.0, m_emulationMaxMs = 0.0, m_coloringMs = 0.0, m_coloringMaxMs = 0.0;
-    int m_timedFrames = 0, m_coloringFrames = 0, m_catchUps = 0;
-    double m_achievementsMs = 0.0, m_achievementsMaxMs = 0.0; // (RetroAchievements' check, apart from the emulation)
-    int m_cpuFrames[16] = {}; // (Android: the frames run on each CPU core - see RunCoreFrames)
-    // The app's side (RunFrame, the render thread): screen refreshes, the late
-    // ones (half a refresh or more over the average) and the longest, and the
-    // refreshes that sent the emulation two game frames at once.
-    std::atomic<int> m_refreshes{0}, m_lateRefreshes{0}, m_doubleRuns{0}, m_longestRefreshUs{0};
-    std::mutex m_perfMutex; // (the emulation thread adds, the app's takes - see TakePerfStats)
-    PerfStats m_perf;
     bool m_colorPackEnabled = true;
     bool m_authoring = false;     // see SetAuthoring
     std::vector<uint64_t> m_records; // one eye's tile records, for the debug view / F7 collector

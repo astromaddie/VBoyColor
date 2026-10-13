@@ -239,20 +239,11 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
     }
 
     // Troubleshooting: development builds only (a push's build from GitHub
-    // Actions, "dev.N") - releases don't show it.
-    if (resources.updater && resources.updater->IsDevBuild())
+    // Actions, "dev.N") - releases don't show it. Windows: the app has no
+    // console - the log, in a window of its own, when asked for.
+    if (resources.updater && resources.updater->IsDevBuild() && m_platform->HasLogWindow())
     {
         list->AddHeader("Troubleshooting");
-        // Frame rate, frame times, the emulation's time, dropped frames - over the game.
-        auto perf = list->AddEntry("Performance overlay", [this](MenuItem *)
-                                   {
-                                       m_settings->perfOverlay = !m_settings->perfOverlay;
-                                       m_settings->Save(*m_platform);
-                                   },
-                                   nullptr, nullptr, UiIconId::Distance);
-        perf->toggle = [this]() { return m_settings && m_settings->perfOverlay; };
-        // Windows: the app has no console - the log, in a window of its own, when asked for.
-        if (m_platform->HasLogWindow())
         {
             auto log = list->AddEntry("Log window", [this](MenuItem *)
                                       {
