@@ -568,6 +568,10 @@ private:
     int m_timedFrames = 0, m_coloringFrames = 0, m_catchUps = 0;
     double m_achievementsMs = 0.0, m_achievementsMaxMs = 0.0; // (RetroAchievements' check, apart from the emulation)
     int m_cpuFrames[16] = {}; // (Android: the frames run on each CPU core - see RunCoreFrames)
+    // The app's side (RunFrame, the render thread): screen refreshes, the late
+    // ones (half a refresh or more over the average) and the longest, and the
+    // refreshes that sent the emulation two game frames at once.
+    std::atomic<int> m_refreshes{0}, m_lateRefreshes{0}, m_doubleRuns{0}, m_longestRefreshUs{0};
     std::mutex m_perfMutex; // (the emulation thread adds, the app's takes - see TakePerfStats)
     PerfStats m_perf;
     bool m_colorPackEnabled = true;

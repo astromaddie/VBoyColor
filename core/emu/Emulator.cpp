@@ -653,6 +653,12 @@ void Emulator::RunFrame(float deltaSeconds)
         step = std::max(0.0f, m_smoothDelta + payBack);
     }
     m_frameAccumulator += step;
+    ++m_refreshes;
+    if (deltaSeconds > m_smoothDelta * 1.5f)
+        ++m_lateRefreshes;
+    const int deltaUs = static_cast<int>(deltaSeconds * 1e6f);
+    if (deltaUs > m_longestRefreshUs.load(std::memory_order_relaxed))
+        m_longestRefreshUs.store(deltaUs, std::memory_order_relaxed);
 
     // Cap catch-up so a debugger pause/hitch doesn't spin retro_run() an
     // enormous number of times on the next real frame.
@@ -670,6 +676,8 @@ void Emulator::RunFrame(float deltaSeconds)
         m_frameAccumulator -= framePeriod;
         ++runs;
     }
+    if (runs > 1)
+        ++m_doubleRuns;
     if (runs > 0)
     {
         {
@@ -790,6 +798,11 @@ void Emulator::RunCoreFrames(int runs)
         LogLine("[Emulator] A frame: emulation %.2f ms on average (%.2f at most; achievements %.2f, %.2f at most), %s - last %d frames, behind %d times%s",
                 m_emulationMs / m_timedFrames, m_emulationMaxMs, m_achievementsMs / m_timedFrames, m_achievementsMaxMs,
                 coloring, m_timedFrames, m_catchUps, build);
+        // The app's side: a late screen refresh sends two game frames at once
+        // too (a stutter that isn't the emulation's).
+        LogLine("[Emulator]   screen: %d refreshes, %d late (the longest %.1f ms), %d sent two game frames at once",
+                m_refreshes.exchange(0), m_lateRefreshes.exchange(0), m_longestRefreshUs.exchange(0) / 1000.0,
+                m_doubleRuns.exchange(0));
 #if defined(__ANDROID__)
         // Which cores ran it, and how fast each is going now (of its top
         // speed): a slow (little) core, or a big one slowed down to cool off.
