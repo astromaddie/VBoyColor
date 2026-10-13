@@ -39,9 +39,9 @@ jobs:
           set -e
           apt-get update -qq
           apt-get install -y -qq cmake git zip python3 > /dev/null
-          # RetroArch's libraries for the Switch (portlibs)
-          dkp-pacman -Sy --noconfirm --needed switch-ffmpeg switch-mesa switch-libdrm_nouveau switch-bzip2 \
-            switch-libpng switch-zlib switch-libvpx switch-libopus switch-liblzma switch-mbedtls
+          # (RetroArch's Switch libraries come with the image - devkitPro's
+          # package server doesn't serve CI machines)
+          ls "$DEVKITPRO/portlibs/switch/lib" | grep -E "avcodec|EGL|vpx|opus|mbedtls|lzma|png|bz2" || true
 
       - uses: actions/checkout@v4
         with:
