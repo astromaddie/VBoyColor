@@ -358,23 +358,6 @@ void SupportPage::Update(uint32_t *buttonState, uint32_t *lastButtonState, float
     const float step = dt < m_smoothDt * 2.6f ? m_smoothDt : dt;
     if (dt < m_smoothDt * 1.5f) // (the average follows steady frames only)
         m_smoothDt = m_smoothDt * 0.95f + dt * 0.05f;
-    // (how the frames went, now and then in the log while playing - for finding stutters)
-    if (m_state == State::Running)
-    {
-        m_statFrames++;
-        m_statSum += deltaSeconds;
-        m_statMax = std::max(m_statMax, deltaSeconds);
-        m_statMin = m_statMin <= 0.0f ? deltaSeconds : std::min(m_statMin, deltaSeconds);
-        if (deltaSeconds > m_smoothDt * 1.5f)
-            m_statLate++;
-        if (m_statSum >= 5.0f)
-        {
-            std::fprintf(stderr, "[Yuno] %d frames in %.1f s: %.2f ms on average (%.2f to %.2f), %d late\n", m_statFrames,
-                         m_statSum, m_statSum / m_statFrames * 1000.0f, m_statMin * 1000.0f, m_statMax * 1000.0f, m_statLate);
-            m_statFrames = m_statLate = 0;
-            m_statSum = m_statMax = m_statMin = 0.0f;
-        }
-    }
     StepGame(step);
 }
 

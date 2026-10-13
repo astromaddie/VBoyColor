@@ -157,8 +157,6 @@ private:
     bool m_onGround = true;
     float m_jumpBuffer = 0; // (a jump pressed just before landing still counts)
     float m_smoothDt = 0; // (see Update)
-    int m_statFrames = 0, m_statLate = 0;
-    float m_statSum = 0, m_statMin = 0, m_statMax = 0;
     float m_runPhase = 0; // (which of his six running frames - at a pace that follows his speed)
     float m_animTime = 0;  // (his running legs - still once the run ends)
     float m_blinkTime = 0; // (the prompts' blink)
