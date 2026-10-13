@@ -448,6 +448,7 @@ std::vector<uint8_t> DesktopPlatform::LoadAssetBytes(const std::string &name)
     };
     static const Entry kEmbedded[] = {
         {"logo/vboycolor_header.png", L"LOGO_HEADER"},
+        {"logo/vboycolor_icon.png", L"LOGO_ICON"}, // (the sidebar's logo)
         {"fonts/Roboto-Regular.ttf", L"FONT_ROBOTO_REGULAR"},
         {"fonts/Roboto-Bold.ttf", L"FONT_ROBOTO_BOLD"},
         {"icons/icons_atlas_10.png", L"ICON_ATLAS_10"},

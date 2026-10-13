@@ -9,6 +9,7 @@
 // window's (GLFW looks for one named GLFW_ICON). From tools/make_icon.py.
 GLFW_ICON           ICON   "@CMAKE_SOURCE_DIR@/platform/desktop/vboycolor.ico"
 LOGO_HEADER         RCDATA "@VBGO_ASSETS_DIR@/runtime/logo/vboycolor_header.png"
+LOGO_ICON           RCDATA "@VBGO_ASSETS_DIR@/runtime/logo/vboycolor_icon.png"
 FONT_ROBOTO_REGULAR RCDATA "@VBGO_ASSETS_DIR@/runtime/fonts/Roboto-Regular.ttf"
 FONT_ROBOTO_BOLD    RCDATA "@VBGO_ASSETS_DIR@/runtime/fonts/Roboto-Bold.ttf"
 ICON_ATLAS_10       RCDATA "@VBGO_ASSETS_DIR@/runtime/icons/icons_atlas_10.png"
