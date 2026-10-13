@@ -168,6 +168,8 @@ void SupportPage::BuildAtlas(UiRenderer &ui)
         m_obstacleSprites.push_back(SpriteIndex(name));
     for (const char *name : {"cloud1", "cloud2", "cloud3", "cloud4"})
         m_cloudSprites.push_back(SpriteIndex(name));
+    for (int i = 0; i < 8; ++i)
+        m_mountainSprites.push_back(SpriteIndex(("mountain" + std::to_string(i)).c_str()));
 }
 
 void SupportPage::BuildSounds()
@@ -371,6 +373,7 @@ void SupportPage::StopGame()
     m_nucita = NucitaMode::Away;
     m_titleTime = 0.0f;
     Generate();
+    GenerateMountains();
     if (m_clouds.empty())
     {
         std::uniform_real_distribution<float> cy(74.0f, 98.0f);
@@ -451,6 +454,25 @@ void SupportPage::Generate()
         m_obstacles.erase(m_obstacles.begin());
 }
 
+void SupportPage::GenerateMountains()
+{
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    while (m_mountainGenX < m_mountainScroll + kGame + 8.0f)
+    {
+        int sprite;
+        do
+            sprite = m_mountainSprites[m_rng() % m_mountainSprites.size()];
+        while (sprite == m_lastMountain && m_mountainSprites.size() > 1);
+        m_lastMountain = sprite;
+        // (side by side, a little overlap or a little gap)
+        const float x = std::round(m_mountainGenX - 10.0f + 26.0f * unit(m_rng));
+        m_mountains.push_back({x, sprite});
+        m_mountainGenX = x + m_sprites[sprite].w;
+    }
+    while (!m_mountains.empty() && m_mountains.front().x + m_sprites[m_mountains.front().sprite].w < m_mountainScroll - 4.0f)
+        m_mountains.erase(m_mountains.begin());
+}
+
 void SupportPage::EndRun(bool fell)
 {
     (void)fell;
@@ -511,7 +533,9 @@ void SupportPage::StepGame(float dt)
     m_speed = std::min(220.0f, 95.0f + 4.0f * m_runTime);
     m_scroll += m_speed * dt;
     m_distance += m_speed * dt;
+    m_mountainScroll += m_speed * 0.2f * dt;
     Generate();
+    GenerateMountains();
 
     // Over a gap? (both feet over it)
     auto overGap = [this]()
@@ -745,11 +769,14 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
     // The sky, far away.
     for (const Cloud &c : m_clouds)
         DrawSprite(ui, c.sprite, std::round(c.x), c.y, ox, oy, alpha, 0.55f);
-    // The hills' line, and Nucita on it.
+    // The mountains.
+    for (const Mountain &m : m_mountains)
+        DrawSprite(ui, m.sprite, std::round(m.x - m_mountainScroll), kHillY - m_sprites[m.sprite].h + 1.0f, ox, oy, alpha, 0.42f);
+    // The hills' line (the mountains' feet), and Nucita on it during a run.
+    for (float hx = -std::fmod(m_scroll * 0.35f, 6.0f); hx < kGame; hx += 6.0f)
+        ui.DrawQuad(x + std::max(0.0f, hx) * u, y + kHillY * u, 3.0f * u, u, WithAlpha({0.3f, 0.0f, 0.0f, 1.0f}, alpha));
     if (m_state != State::Title)
     {
-        for (float hx = -std::fmod(m_scroll * 0.35f, 6.0f); hx < kGame; hx += 6.0f)
-            ui.DrawQuad(x + std::max(0.0f, hx) * u, y + kHillY * u, 3.0f * u, u, WithAlpha({0.3f, 0.0f, 0.0f, 1.0f}, alpha));
         if (m_nucita != NucitaMode::Away)
         {
             int sprite;

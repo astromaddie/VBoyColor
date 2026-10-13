@@ -79,6 +79,11 @@ private:
         float x, y; // on screen (they drift on their own)
         int sprite;
     };
+    struct Mountain
+    {
+        float x; // in the mountains' own (slow) scroll
+        int sprite;
+    };
     struct Sprite
     {
         int w = 0, h = 0;
@@ -129,7 +134,7 @@ private:
     std::vector<Sprite> m_sprites;
     int m_sRun[6]{}, m_sJump = 0, m_sSit = 0, m_sGround = 0, m_sFill = 0, m_sEdgeL = 0, m_sEdgeR = 0;
     int m_sNucitaSit = 0, m_sNucitaBlink = 0, m_sNucitaWalk[4]{}, m_sNucitaHop[2]{};
-    std::vector<int> m_obstacleSprites, m_cloudSprites;
+    std::vector<int> m_obstacleSprites, m_cloudSprites, m_mountainSprites;
 
     std::vector<int16_t> m_jumpSound, m_overSound;
 
@@ -149,6 +154,11 @@ private:
     std::vector<Piece> m_pieces;
     std::vector<Obstacle> m_obstacles;
     std::vector<Cloud> m_clouds;
+    // The mountains far behind, scrolling at a fifth of the ground's speed.
+    std::vector<Mountain> m_mountains;
+    float m_mountainScroll = 0, m_mountainGenX = 0;
+    int m_lastMountain = -1;
+    void GenerateMountains();
     float m_genX = 0, m_nextEventX = 0, m_nextCloud = 0;
     // Nucita, far away on the hills.
     enum class NucitaMode
