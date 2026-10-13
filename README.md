@@ -156,8 +156,8 @@ pack).*
   Your own save stays untouched; when the run ends, you take over.
 
 - **Support, and Yuno's Adventure** - Support in the menu's sidebar: if
-  you'd like to gift me a coffee, the button there opens my GitHub Sponsors
-  page. Under it, a little thank-you for stopping by: an endless runner in
+  you'd like to gift me a coffee, the button there opens my Ko-fi page (a
+  card or PayPal, no account needed). Under it, a little thank-you for stopping by: an endless runner in
   the Virtual Boy's reds, where my cat Yuno jumps rocks, bushes and gaps
   (A, Space, a click or a tap to jump; your best score is kept).
 
@@ -289,9 +289,12 @@ CMake project. Every push is built by GitHub Actions.
 
 ## Support the project
 
-[![Support VBoy Color](images/support-badge.svg)](https://github.com/sponsors/yuk27)
+[![Support VBoy Color](images/support-badge.svg)](https://ko-fi.com/yuk27)
 
-https://github.com/sponsors/yuk27
+Gift me a coffee on Ko-fi - a card or PayPal, no account needed:
+https://ko-fi.com/yuk27
+
+Or sponsor me on GitHub: https://github.com/sponsors/yuk27
 
 ## License
 

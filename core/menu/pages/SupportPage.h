@@ -11,7 +11,7 @@ class Platform;
 class Emulator;
 
 // Support (the sidebar, above Quit): a few words from Juan and a "Gift me a
-// coffee" button (his GitHub Sponsors page, one time) - and under it Yuno's
+// coffee" button (his Ko-fi page - a card or PayPal, no account needed) - and under it Yuno's
 // Adventure, a little endless runner in the Virtual Boy's reds starring his
 // cat Yuno (his sister Nucita shows up far away now and then). Jump
 // over rocks, bushes and gaps: A (any face button on a gamepad, Space or Enter on a
@@ -22,7 +22,7 @@ class SupportPage : public MenuPage
 {
 public:
     static constexpr const char *kSponsorUrl =
-        "https://github.com/sponsors/yuk27/sponsorships?sponsor=yuk27&frequency=one-time&amount=1";
+        "https://ko-fi.com/yuk27";
 
     void Init(UiRenderer &ui, const UiMenuResources &resources) override;
     std::string Title() const override { return "Support"; }
