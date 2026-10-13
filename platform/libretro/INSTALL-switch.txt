@@ -1,0 +1,26 @@
+VBoy Color - RetroArch core for the Nintendo Switch
+===================================================
+
+For a Switch that runs homebrew, with RetroArch for the Switch installed
+(its "retroarch" folder on the SD card).
+
+1. Copy the "retroarch" folder from this zip onto the root of the SD card,
+   merging it with the one already there. That puts:
+
+     retroarch/cores/vboycolor_libretro_libnx.nro   (the core)
+     retroarch/info/vboycolor_libretro_libnx.info   (what RetroArch shows for it)
+
+2. Put your games (.vb or .zip) anywhere on the SD card, a "roms" folder for example.
+
+3. Open RetroArch: Load Core > Nintendo - Virtual Boy (VBoy Color), then
+   Load Content > your game. (On the Switch every core is a RetroArch of its
+   own: loading this core restarts RetroArch with it - that's normal.)
+
+Quick Menu > Core Options has the colors (the game's own, Auto, Multicolor,
+Gradient, Tint), the color packs and the 3D (side by side, top and bottom,
+colored glasses).
+
+Running Android (switchroot) or Linux (L4T) on your Switch instead? Use the
+android-arm64 or linux-arm64 core.
+
+https://github.com/yuk27/VBoyColor

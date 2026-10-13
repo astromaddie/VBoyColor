@@ -8,6 +8,12 @@
 # gives vboycolor_libretro.so (.dll on Windows, .dylib on macOS; Android:
 # configure with the NDK's toolchain file) - copy it into the frontend's
 # cores folder, and vboycolor_libretro.info into its info folder.
+#
+# Nintendo Switch (devkitPro's toolchain file, $DEVKITPRO/cmake/Switch.cmake):
+# a static library instead, vboycolor_libretro.a - RetroArch for the Switch
+# links its core in (one RetroArch .nro per core: copied into RetroArch's
+# tree as libretro_libnx.a, then make -f Makefile.libnx - see the CI's
+# switch job).
 cmake_minimum_required(VERSION 3.22)
 project(vboycolor_libretro LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
@@ -25,6 +31,12 @@ endif()
 # match). Off for a manylinux build (CI's Linux cores), whose compiler
 # already links what's newer than the old system's libstdc++ in.
 option(VBC_STATIC_RUNTIME "Link the C++ runtime into the core" ON)
+
+# A static library, for a frontend that links its core in (the Switch's).
+option(VBC_STATIC_CORE "Build the core as a static library (RetroArch for the Switch)" OFF)
+if(NINTENDO_SWITCH)
+    set(VBC_STATIC_CORE ON)
+endif()
 
 get_filename_component(REPO ${CMAKE_CURRENT_SOURCE_DIR}/../.. ABSOLUTE)
 set(VB_CORE_DIR ${REPO}/third_party/beetle-vb-libretro)
@@ -45,7 +57,14 @@ add_custom_target(vboycolor_version ALL
 include(${REPO}/cmake/PatchBeetleVip.cmake)
 vbgo_generate_patched_vip(${VB_CORE_DIR} ${GENERATED}/beetle-vb)
 
-add_library(beetle_vb STATIC
+# (static core: object files that go into the core's own archive - one
+# library for the frontend to link)
+if(VBC_STATIC_CORE)
+    set(BEETLE_KIND OBJECT)
+else()
+    set(BEETLE_KIND STATIC)
+endif()
+add_library(beetle_vb ${BEETLE_KIND}
     ${VB_CORE_DIR}/mednafen/hw_cpu/v810/v810_cpu.cpp
     ${VB_CORE_DIR}/mednafen/mempatcher.cpp
     ${VB_CORE_DIR}/libretro.cpp
@@ -57,9 +76,12 @@ add_library(beetle_vb STATIC
     ${VB_CORE_DIR}/mednafen/sound/Blip_Buffer.c
     ${VB_CORE_DIR}/mednafen/state.c
     ${VB_CORE_DIR}/mednafen/settings.c
-    ${VB_CORE_DIR}/libretro-common/compat/compat_strl.c
-    ${VB_CORE_DIR}/libretro-common/compat/compat_snprintf.c
     ${REPO}/core/emu/vbgo_tiletrack.c)
+if(NOT VBC_STATIC_CORE)
+    # (a frontend that links its core in has libretro-common's own - twice would clash)
+    target_sources(beetle_vb PRIVATE ${VB_CORE_DIR}/libretro-common/compat/compat_strl.c
+        ${VB_CORE_DIR}/libretro-common/compat/compat_snprintf.c)
+endif()
 set_target_properties(beetle_vb PROPERTIES POSITION_INDEPENDENT_CODE ON C_VISIBILITY_PRESET hidden
     CXX_VISIBILITY_PRESET hidden)
 target_include_directories(beetle_vb PUBLIC ${VB_CORE_DIR} ${VB_CORE_DIR}/mednafen
@@ -87,7 +109,12 @@ add_custom_command(OUTPUT ${PACKS_C}
     COMMENT "Zipping the color packs into the core")
 
 # ---- The core ----
-add_library(vboycolor_libretro SHARED
+if(VBC_STATIC_CORE)
+    set(CORE_KIND STATIC)
+else()
+    set(CORE_KIND SHARED)
+endif()
+add_library(vboycolor_libretro ${CORE_KIND}
     libretro_core.cpp
     ${PACKS_C}
     ${REPO}/core/emu/ShadeColorizer.cpp
@@ -106,7 +133,9 @@ if(NOT MSVC)
     target_compile_options(vboycolor_libretro PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>)
 endif()
 target_link_libraries(vboycolor_libretro PRIVATE beetle_vb)
-if(UNIX AND NOT APPLE)
+if(VBC_STATIC_CORE)
+    # (nothing to link: the frontend does, with the core inside)
+elseif(UNIX AND NOT APPLE)
     # Only retro_* leave the core; no C++ runtime of its own to clash with the frontend's.
     target_link_options(vboycolor_libretro PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/link.T
         -Wl,--no-undefined)
