@@ -191,11 +191,12 @@ asks. The game fills the screen's height, with the Virtual Boy controller
 beside it: the left D-pad with Select and Start (and the menu button under
 them), B and A with the right D-pad above them (only in the games that use
 it - Red Alarm, Teleroboxer, 3-D Tetris and Golf), L and R on top. Settings →
-Touch controls → Edit lets you drag every control where you want it and
+Arrange touch controls lets you drag every control where you want it and
 make it bigger or smaller (the buttons are Kenney's Input Prompts) - and a
 game can have its own layout (hold its card in the library). Connect a
 gamepad and the on-screen buttons step aside until you touch the screen
-again. Back opens the menu, and Back (or *Back to game*) returns to the
+again - or switch them off for good in Settings → Touch controls (the game
+then fills the screen; a gamepad plays). Back opens the menu, and Back (or *Back to game*) returns to the
 game. With no game loaded, the menu sits inside a Virtual Boy.
 
 ### Android TV and Fire TV

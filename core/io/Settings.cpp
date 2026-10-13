@@ -49,6 +49,8 @@ namespace
             return offsetof(AppSettings, yunoBest);
         case 23:
             return offsetof(AppSettings, logWindow);
+        case 24:
+            return offsetof(AppSettings, touchControls);
         default:
             return 0;
         }

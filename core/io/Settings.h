@@ -104,7 +104,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 24;
+    static constexpr int kVersion = 25;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -200,6 +200,10 @@ struct AppSettings
     // Version 24 (appended): Settings > Log window (Windows - see
     // Platform::ShowLogWindow).
     bool logWindow = false;
+
+    // Version 25 (appended): the phone's on-screen controls (Settings >
+    // Controls > Touch controls) - off, it's a gamepad (and Back for the menu).
+    bool touchControls = true;
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

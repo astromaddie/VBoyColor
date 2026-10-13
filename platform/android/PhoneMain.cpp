@@ -556,9 +556,12 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         touch.SetGame(platform, emulator.RomName());
         const bool editing = touch.Editing();
 
-        // The touch controls: hidden while a gamepad plays, back on a touch.
+        // The touch controls: hidden while a gamepad plays, back on a touch -
+        // or not at all, switched off in Settings (a gamepad and Back then).
         if (editing)
             touch.SetVisible(true);
+        else if (!settings.touchControls)
+            touch.SetVisible(false);
         else if (state.gamepadUsed)
             touch.SetVisible(false);
         else if (state.touched)

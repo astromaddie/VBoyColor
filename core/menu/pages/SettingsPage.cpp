@@ -118,8 +118,16 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
     // The phone: move the on-screen controls (see TouchControls' edit mode).
     if (resources.buttonMappingProfile == ButtonMappingProfile::Phone)
     {
+        // (off: a gamepad plays, and Back opens the menu)
+        auto shown = list->AddEntry("Touch controls", [this](MenuItem *)
+                                    {
+                                        m_settings->touchControls = !m_settings->touchControls;
+                                        m_settings->Save(*m_platform);
+                                    },
+                                    nullptr, nullptr, UiIconId::Mapping);
+        shown->toggle = [this]() { return m_settings && m_settings->touchControls; };
         const std::function<void(const std::string &)> *edit = &resources.editTouchControls;
-        list->AddEntry("Touch controls", [edit](MenuItem *)
+        list->AddEntry("Arrange touch controls", [edit](MenuItem *)
                        { if (*edit) (*edit)(""); }, nullptr, nullptr, UiIconId::Move)
             ->SetValue("Edit");
     }
