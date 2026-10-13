@@ -246,7 +246,7 @@ void OpenXrApp::Initialize(const InitInfo &info)
     CreateSwapchains();
 
     m_settings.Load(*m_platform); // no-op (defaults stand) on first run/missing file
-    if (m_settings.logWindow)
+    if (m_settings.logWindow && std::string(kVersionString).find("-dev.") != std::string::npos) // (development builds only)
         m_platform->ShowLogWindow(true);
     ApplyDefaultGameplayBindings(m_settings);
     m_appMenu.Initialize(m_uiRenderer, static_cast<VkFormat>(m_colorFormat), m_emulator, m_settings, *m_platform,

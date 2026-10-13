@@ -1382,7 +1382,11 @@ void AppMenu::ShowNotice(const std::string &caption, const std::string &title, c
 // -----------------------------------------------------------------------
 // Performance overlay
 
-bool AppMenu::PerfOverlayOn() const { return m_resources.settings && m_resources.settings->perfOverlay; }
+// (development builds only - the ones GitHub Actions makes on every push, never a release)
+bool AppMenu::PerfOverlayOn() const
+{
+    return m_resources.settings && m_resources.settings->perfOverlay && m_updater.IsDevBuild();
+}
 
 void AppMenu::UpdatePerf(float deltaSeconds)
 {

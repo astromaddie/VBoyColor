@@ -1,6 +1,7 @@
 #include "menu/pages/SettingsPage.h"
 #include "menu/pages/EmulatorButtonMapPage.h"
 #include "menu/pages/FolderPage.h"
+#include "io/Updater.h"
 #include "emu/AutoColors.h"
 #include "emu/Emulator.h"
 #include "io/Platform.h"
@@ -237,26 +238,31 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
             nullptr, nullptr, UiIconId::RomList);
     }
 
-    list->AddHeader("Troubleshooting");
-    // Frame rate, frame times, the emulation's time, dropped frames - over the game.
-    auto perf = list->AddEntry("Performance overlay", [this](MenuItem *)
-                               {
-                                   m_settings->perfOverlay = !m_settings->perfOverlay;
-                                   m_settings->Save(*m_platform);
-                               },
-                               nullptr, nullptr, UiIconId::Distance);
-    perf->toggle = [this]() { return m_settings && m_settings->perfOverlay; };
-    // Windows: the app has no console - the log, in a window of its own, when asked for.
-    if (m_platform->HasLogWindow())
+    // Troubleshooting: development builds only (a push's build from GitHub
+    // Actions, "dev.N") - releases don't show it.
+    if (resources.updater && resources.updater->IsDevBuild())
     {
-        auto log = list->AddEntry("Log window", [this](MenuItem *)
-                                  {
-                                      m_settings->logWindow = !m_settings->logWindow;
-                                      m_platform->ShowLogWindow(m_settings->logWindow);
-                                      m_settings->Save(*m_platform);
-                                  },
-                                  nullptr, nullptr, UiIconId::Header);
-        log->toggle = [this]() { return m_settings && m_settings->logWindow; };
+        list->AddHeader("Troubleshooting");
+        // Frame rate, frame times, the emulation's time, dropped frames - over the game.
+        auto perf = list->AddEntry("Performance overlay", [this](MenuItem *)
+                                   {
+                                       m_settings->perfOverlay = !m_settings->perfOverlay;
+                                       m_settings->Save(*m_platform);
+                                   },
+                                   nullptr, nullptr, UiIconId::Distance);
+        perf->toggle = [this]() { return m_settings && m_settings->perfOverlay; };
+        // Windows: the app has no console - the log, in a window of its own, when asked for.
+        if (m_platform->HasLogWindow())
+        {
+            auto log = list->AddEntry("Log window", [this](MenuItem *)
+                                      {
+                                          m_settings->logWindow = !m_settings->logWindow;
+                                          m_platform->ShowLogWindow(m_settings->logWindow);
+                                          m_settings->Save(*m_platform);
+                                      },
+                                      nullptr, nullptr, UiIconId::Header);
+            log->toggle = [this]() { return m_settings && m_settings->logWindow; };
+        }
     }
 
     m_menu.MenuItems.push_back(list);

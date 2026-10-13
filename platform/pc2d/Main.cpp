@@ -486,7 +486,7 @@ int main(int argc, char **argv)
     AppMenu appMenu;
     AppSettings settings;
     settings.Load(platform); // no-op (defaults stand) on first run/missing file
-    if (settings.logWindow)
+    if (settings.logWindow && std::string(kVersionString).find("-dev.") != std::string::npos) // (development builds only)
         platform.ShowLogWindow(true);
     ApplyDefaultGameplayBindings(settings);
     VkSurfaceKHR surface = VK_NULL_HANDLE;
