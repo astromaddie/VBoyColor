@@ -329,9 +329,87 @@ jobs:
           tail -n 60 build.log | sed 's/%/%25/g; s/\r//g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=libretro ${{ matrix.platform }}::/'
           echo
 
+  # The RetroArch core for the Nintendo Switch (homebrew - RetroArch for the
+  # Switch, libnx): the Switch can't load a core from a file, so each core is
+  # a whole RetroArch with the core linked in - one .nro per core
+  # (vboycolor_libretro_libnx.nro), put in RetroArch's cores folder on the SD
+  # card (platform/libretro/INSTALL-switch.txt). Built in devkitPro's
+  # devkitA64 image: the core as a static library (VBC_STATIC_CORE), then
+  # RetroArch's Makefile.libnx with it as libretro_libnx.a.
+  switch:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    env:
+      # The RetroArch release the core goes into.
+      RETROARCH_VERSION: v1.22.2
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Tools
+        run: |
+          set -e
+          apt-get update -qq
+          # (RetroArch's Switch libraries come with the image - devkitPro's
+          # package server doesn't serve CI machines)
+          apt-get install -y -qq cmake git zip python3 > /dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: The core (static)
+        run: |
+          set -eo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/third_party/beetle-vb-libretro"
+          cmake -S platform/libretro -B build/switch -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake" \
+            -DCMAKE_BUILD_TYPE=Release -DVBC_STATIC_CORE=ON -DVBGO_RELEASE_BUILD=$OFFICIAL \
+            -DVBGO_PRERELEASE="${PRERELEASE#*-}" 2>&1 | tee build.log
+          cmake --build build/switch --parallel 2>&1 | tee build.log
+
+      - name: RetroArch with the core
+        run: |
+          set -eo pipefail
+          git clone -q --depth 1 --branch "$RETROARCH_VERSION" https://github.com/libretro/RetroArch.git retroarch
+          cp build/switch/vboycolor_libretro.a retroarch/libretro_libnx.a
+          cd retroarch
+          make -f Makefile.libnx -j"$(nproc)" APP_TITLE="VBoy Color" APP_AUTHOR="yuk27, libretro Team" 2>&1 | tee ../build.log | grep -E "error|warning: .*libretro_libnx|Linking|built" || true
+          test -f retroarch_switch.nro
+
+      - name: Package
+        run: |
+          set -e
+          version=$(sed -n 's/.*kGeneratedVersionString = "\([^"]*\)".*/\1/p' build/switch/generated/Version.h)
+          dir=vboycolor_libretro-$version-switch
+          # (the SD card's layout: copy the retroarch folder onto the card's root)
+          mkdir -p "$dir/retroarch/cores" "$dir/retroarch/info"
+          cp retroarch/retroarch_switch.nro "$dir/retroarch/cores/vboycolor_libretro_libnx.nro"
+          cp platform/libretro/vboycolor_libretro.info "$dir/retroarch/info/vboycolor_libretro_libnx.info"
+          cp platform/libretro/INSTALL-switch.txt "$dir/INSTALL.txt"
+          cp LICENSE THIRD-PARTY-NOTICES.md "$dir/"
+          cp -r licenses "$dir/"
+          (cd "$dir" && zip -qr "../$dir.zip" .)
+          echo "PACKAGE=$dir" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE }}
+          path: ${{ env.PACKAGE }}.zip
+          if-no-files-found: error
+
+      - name: Report the failure
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E "error|undefined reference|multiple definition" build.log | head -n 40 | sed 's/%/%25/g; s/\r//g' | sed 's/^/::error title=switch::/' || true
+          tail -n 40 build.log | sed 's/%/%25/g; s/\r//g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=switch (end of log)::/'
+          echo
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux, android, libretro]
+    needs: [windows, linux, android, libretro, switch]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -367,8 +445,9 @@ jobs:
             echo "| **Windows** 10 / 11, 64-bit, with a Vulkan graphics driver - \`VBoyColor.exe\` plays in a window; \`VBoyColorVR.exe\` in a PC VR headset (Quest Link / Air Link, Virtual Desktop, SteamVR) | \`$win\` |"
             echo "| **Linux** x86-64 with Vulkan - in a window | \`$lin\` |"
             echo "| **RetroArch** (or another libretro frontend) on Windows, Linux (x86-64 and ARM64), macOS or Android - the colors and the 3D for a normal screen, as a core | \`vboycolor_libretro-...-<platform>.zip\` |"
+            echo "| **Nintendo Switch** (homebrew, RetroArch for the Switch) - the RetroArch core; copy its \`retroarch\` folder onto the SD card | \`vboycolor_libretro-...-switch.zip\` |"
             echo
-            echo "Not yet as an app: macOS (the RetroArch core runs there), iPhone / iPad, Nintendo Switch, 32-bit Android. Other Android VR headsets are untested."
+            echo "Not yet as an app: macOS and the Nintendo Switch (the RetroArch core runs on both), iPhone / iPad, 32-bit Android. Other Android VR headsets are untested."
             echo
             echo "VBoy Color updates itself from here (About -> Update). No games are included - use only ROMs you made from cartridges you own."
             echo

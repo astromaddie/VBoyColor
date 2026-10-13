@@ -7,7 +7,7 @@ it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
 3D, but in color instead of red on black. On Windows and Linux it plays them
 in a window, no headset needed, and on Android phones, tablets and handhelds
 with touch controls or a gamepad. It is also a RetroArch core, for Windows,
-Linux, macOS and Android.
+Linux, macOS, Android and the Nintendo Switch (homebrew).
 
 <p align="center"><a href="https://youtu.be/vsScgEVnbME"><img src="images/demo-video.jpg" alt="VBoy Color demo video: eight Virtual Boy games, the original red next to VBoy Color" width="720"></a><br>
 <a href="https://youtu.be/vsScgEVnbME"><b>▶ Watch the demo</b></a> - eight games, the original red next to VBoy Color (2 min)</p>
@@ -230,7 +230,7 @@ Download `VBoyColor-<version>-linux-x64.tar.gz`, unpack it, put your ROMs in
 VBoy Color is also a RetroArch core (or for any other libretro frontend):
 the same emulation and colors, with the 3D for a normal screen. Download
 `vboycolor_libretro-<version>-<platform>.zip` for Windows, Linux (x86-64 or
-ARM64), macOS or Android from
+ARM64), macOS, Android or the Nintendo Switch from
 [Releases](https://github.com/yuk27/VBoyColor/releases), then:
 
 1. Copy the core (`vboycolor_libretro.dll`, `.so` or `.dylib`) into
@@ -252,6 +252,14 @@ name, takes the place of its game's pack. RetroArch's save states, rewind,
 run-ahead, shaders and RetroAchievements work as with any other core. On
 macOS, if RetroArch won't load the core, clear the download's quarantine
 first: `xattr -d com.apple.quarantine vboycolor_libretro.dylib`.
+
+**Nintendo Switch** (homebrew, with RetroArch for the Switch): the Switch
+can't load a core from a file, so the core comes as a RetroArch of its own,
+`vboycolor_libretro_libnx.nro`. Copy the zip's `retroarch` folder onto the
+SD card's root, merging it with the one there, then Load Core → **Nintendo -
+Virtual Boy (VBoy Color)** (RetroArch restarts with it - normal on the
+Switch). A Switch running Android or Linux uses the `android-arm64` or
+`linux-arm64` core instead.
 
 ## Controls
 
