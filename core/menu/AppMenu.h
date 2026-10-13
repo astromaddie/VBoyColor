@@ -16,6 +16,7 @@
 #include "menu/pages/AchievementsPage.h"
 #include "menu/pages/TextInputPage.h"
 #include "menu/pages/HotkeysPage.h"
+#include "menu/pages/SupportPage.h"
 #include "input/Hotkeys.h"
 #include "achievements/Achievements.h"
 #include "gfx/UiRenderer.h"
@@ -61,6 +62,7 @@ public:
         SidebarSettings,
         SidebarAbout,
         SidebarCloseGame, // (while a game runs: back to the library, nothing running)
+        SidebarSupport,   // (a coffee, and Yuno's Adventure)
         SidebarQuit,      // (where the app can close itself - Platform::CanQuit)
         SidebarCount
     };
@@ -254,6 +256,7 @@ private:
     AchievementsPage m_achievementsPage;
     TextInputPage m_textInputPage;
     HotkeysPage m_hotkeysPage;
+    SupportPage m_supportPage;
     GameControls m_gameControls;
 
     ThumbnailLibrary m_thumbnails;

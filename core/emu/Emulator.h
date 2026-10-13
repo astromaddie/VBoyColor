@@ -133,6 +133,11 @@ public:
     // core emptied, the screen black - the library with nothing running.
     // False when no ROM is loaded.
     bool CloseGame();
+    // A short sound of the menu's own (the Support page's game), straight to
+    // the audio output - interleaved stereo 16-bit at AudioOutput::kSampleRate.
+    // Only while the game is paused (the menu open): the core pushes its own
+    // samples otherwise.
+    void PlayMenuSound(const int16_t *interleaved, size_t frames) { m_audioOutput.PushSamples(interleaved, frames); }
     // The game's picture as the screen shows it - the left eye, colored, the
     // Tint mode's color or the Gradient mode's colors applied (tint and
     // pattern: AppSettings::ScreenTint() / ScreenPattern()) - as a PNG at

@@ -51,7 +51,7 @@ namespace
 
     // The sidebar's pages.
     constexpr float kNavTop = 46.0f;
-    constexpr float kNavPitch = 19.0f; // (room for Close game and Quit above the clock)
+    constexpr float kNavPitch = 18.0f; // (room for Close game, Support and Quit above the clock)
     constexpr float kNavSubtitleExtra = 7.0f; // (Resume shows the game under it)
     constexpr float kNavIconSize = 10.0f;
     // A notice over the game (an achievement unlocked), in the menu's logical units.
@@ -331,7 +331,7 @@ void AppMenu::InitPages(UiRenderer &ui)
 {
     MenuPage *pages[] = {&m_libraryPage,      &m_saveStatesPage, &m_settingsPage, &m_emulatorButtonMapPage,
                          &m_moveScreenPage,   &m_folderPage,     &m_gameControlsPage, &m_aboutPage,
-                         &m_achievementsPage, &m_textInputPage,  &m_hotkeysPage};
+                         &m_achievementsPage, &m_textInputPage,  &m_hotkeysPage,      &m_supportPage};
     for (MenuPage *page : pages)
     {
         page->Navigate = [this](MenuPage *target, int dir) { StartTransition(target, dir); };
@@ -349,6 +349,7 @@ void AppMenu::InitPages(UiRenderer &ui)
     m_achievementsPage.sidebarItem = SidebarAchievements;
     m_textInputPage.sidebarItem = SidebarAchievements;
     m_hotkeysPage.sidebarItem = SidebarSettings;
+    m_supportPage.sidebarItem = SidebarSupport;
 
     // Cross-page links
     m_settingsPage.emulatorButtonMapPage = &m_emulatorButtonMapPage;
@@ -381,7 +382,7 @@ void AppMenu::InitPages(UiRenderer &ui)
     // The sidebar's own pages: B goes back to the game (or the sidebar).
     for (MenuPage *page : {static_cast<MenuPage *>(&m_libraryPage), static_cast<MenuPage *>(&m_saveStatesPage),
                            static_cast<MenuPage *>(&m_achievementsPage), static_cast<MenuPage *>(&m_settingsPage),
-                           static_cast<MenuPage *>(&m_aboutPage)})
+                           static_cast<MenuPage *>(&m_aboutPage), static_cast<MenuPage *>(&m_supportPage)})
         page->SetBackPress([this]() { BackFromPage(); });
 }
 
@@ -402,6 +403,8 @@ MenuPage *AppMenu::PageFor(int item)
         return &m_settingsPage;
     case SidebarAbout:
         return &m_aboutPage;
+    case SidebarSupport:
+        return &m_supportPage;
     default:
         return nullptr;
     }
@@ -602,6 +605,7 @@ void AppMenu::HandlePointer(float deltaSeconds)
     }
     bool moved = p.present && (std::abs(p.x - p.lastX) > 0.01f || std::abs(p.y - p.lastY) > 0.01f);
     bool clicked = p.present && p.down && !p.wasDown;
+    const bool pressedNow = clicked; // (the moment it's pressed, whatever a laser's click waits for)
     bool longPressed = p.present && p.secondaryDown && !p.secondaryWasDown; // (the mouse's right button)
     p.secondaryWasDown = p.secondaryDown;
     float dragY = 0.0f, flingY = 0.0f;
@@ -716,13 +720,14 @@ void AppMenu::HandlePointer(float deltaSeconds)
     MenuPage *page = TargetPage();
     if (!page || m_nextPage)
         return;
-    if ((moved || clicked) && m_sidebarFocus && page->HasFocusable())
+    if ((moved || clicked || pressedNow) && m_sidebarFocus && page->HasFocusable())
         FocusContent();
     MenuPointer pointer;
     pointer.x = p.x;
     pointer.y = p.y;
     pointer.moved = moved;
     pointer.clicked = clicked;
+    pointer.pressed = pressedNow && !p.dragging;
     pointer.longPressed = longPressed;
     pointer.scroll = scroll;
     pointer.dragging = p.dragging;
@@ -905,7 +910,7 @@ std::vector<MenuHint> AppMenu::CurrentHints() const
     std::vector<MenuHint> hints = page->Hints();
     // On the sidebar's own pages B goes back to the game.
     const bool topLevel = page == &m_libraryPage || page == &m_saveStatesPage || page == &m_achievementsPage ||
-                          page == &m_settingsPage || page == &m_aboutPage;
+                          page == &m_settingsPage || page == &m_aboutPage || page == &m_supportPage;
     for (MenuHint &hint : hints)
         if (hint.icon == UiIconId::ButtonB && topLevel && game)
             hint.label = "Resume";
@@ -982,11 +987,12 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
     }
 
     // The pages.
-    static constexpr const char *kNames[SidebarCount] = {"Resume", "Library", "Save states", "Achievements", "Settings",
-                                                         "About",  "Close game", "Quit"};
+    static constexpr const char *kNames[SidebarCount] = {"Resume", "Library",    "Save states", "Achievements", "Settings",
+                                                         "About",  "Close game", "Support",     "Quit"};
+    // (Support: a cup of coffee, drawn - see SupportPage::DrawCoffeeCup)
     static constexpr UiIconId kIcons[SidebarCount] = {UiIconId::Resume,   UiIconId::RomList, UiIconId::SaveSlot,
                                                       UiIconId::Trophy,   UiIconId::Settings, UiIconId::Header,
-                                                      UiIconId::Back, UiIconId::Exit};
+                                                      UiIconId::Back,     UiIconId::None,     UiIconId::Exit};
     const int active = TargetPage() ? TargetPage()->sidebarItem : -1;
     for (int i = 0; i < SidebarCount; ++i)
     {
@@ -1011,7 +1017,10 @@ void AppMenu::DrawSidebar(UiRenderer &ui)
         else if (i == m_sidebarHover)
             ui.DrawQuadRounded(5.0f, y - 3.0f, 76.0f, h, kMenuHighlightColor, 5.0f);
         const XrColor4f color = (cursor || on) ? kMenuSelectionColor : enabled ? kMenuTextColor : WithAlpha(kMenuDimTextColor, 0.6f);
-        m_icons.Draw(ui, kIcons[i], 12.0f, y, kNavIconSize, 1.0f, color);
+        if (i == SidebarSupport)
+            SupportPage::DrawCoffeeCup(ui, 12.0f, y, kNavIconSize, color);
+        else
+            m_icons.Draw(ui, kIcons[i], 12.0f, y, kNavIconSize, 1.0f, color);
         const UiFontHandle font = (cursor || on) ? m_resources.bodyBoldFont : m_resources.bodyFont;
         ui.DrawText(font, kNames[i], 27.0f, TextY(ui, font, y + kNavIconSize / 2.0f), 1.0f, color);
         if (i == SidebarResume && enabled)
@@ -1330,8 +1339,12 @@ bool AppMenu::RunHotkeyAction(HotkeyAction action)
 
 void AppMenu::SubmitRawKey(int key, int mods)
 {
-    if (m_open && !m_sidebarFocus && m_transitionState <= 0.0f && m_currentPage == &m_hotkeysPage)
+    if (!m_open || m_sidebarFocus || m_transitionState > 0.0f)
+        return;
+    if (m_currentPage == &m_hotkeysPage)
         m_hotkeysPage.SubmitKey(key, mods);
+    else if (m_currentPage == &m_supportPage && mods == 0)
+        m_supportPage.SubmitKey(key);
 }
 
 void AppMenu::TakeScreenshot()

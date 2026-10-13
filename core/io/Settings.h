@@ -104,7 +104,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 22;
+    static constexpr int kVersion = 23;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -192,6 +192,10 @@ struct AppSettings
     bool paintingTools = false;
     bool hotkeysSet = false;
     Hotkey hotkeys[kHotkeySlots];
+
+    // Version 23 (appended): Yuno's Adventure's best score (the Support
+    // page's little game - menu/pages/SupportPage.h).
+    int32_t yunoBest = 0;
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

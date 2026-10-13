@@ -45,6 +45,8 @@ namespace
             return offsetof(AppSettings, gamepadByPosition);
         case 21:
             return offsetof(AppSettings, paintingTools);
+        case 22:
+            return offsetof(AppSettings, yunoBest);
         default:
             return 0;
         }

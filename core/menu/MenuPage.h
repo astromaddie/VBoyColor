@@ -70,7 +70,7 @@ public:
 
     // The page has the focus (else the sidebar has): only then does its
     // selection show.
-    void SetFocused(bool focused)
+    virtual void SetFocused(bool focused)
     {
         if (m_menu.MenuItems.empty())
             return;
