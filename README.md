@@ -156,7 +156,7 @@ pack).*
   Your own save stays untouched; when the run ends, you take over.
 
 - **Support, and Yuno's Adventure** - Support in the menu's sidebar: if
-  you'd like to buy me a coffee, the button there opens my GitHub Sponsors
+  you'd like to gift me a coffee, the button there opens my GitHub Sponsors
   page. Under it, a little thank-you for stopping by: an endless runner in
   the Virtual Boy's reds, where my cat Yuno jumps rocks, bushes and gaps
   (A, Space, a click or a tap to jump; your best score is kept).

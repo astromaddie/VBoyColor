@@ -18,7 +18,8 @@ namespace
     constexpr float kGroundY = 152.0f; // the ground's top
     constexpr float kHillY = kGroundY + 1.0f; // the mountains' feet (behind the ground's edge) - and Nucita's, far away
     constexpr float kYunoX = 20.0f;   // (his sprite's left: the tail - his body from +11 to +34)
-    constexpr float kGravity = 1150.0f, kJumpSpeed = 310.0f;
+    constexpr float kGravity = 1150.0f, kJumpSpeed = 340.0f;
+    constexpr float kObstacleScale = 2.0f; // (the rocks and bushes, twice their drawn size)
     constexpr float kTileW = 24.0f, kEdgeW = 15.0f;
 
     // The Virtual Boy's four shades of red (sRGB), black to brightest.
@@ -230,7 +231,7 @@ std::vector<MenuHint> SupportPage::Hints() const
 {
     if (m_focus == Focus::Game)
         return {{UiIconId::ButtonA, m_state == State::Running ? "Jump" : "Play"}, {UiIconId::ButtonB, "Back"}};
-    return {{UiIconId::ButtonA, "Buy me a coffee"}, {UiIconId::ButtonB, "Back"}};
+    return {{UiIconId::ButtonA, "Gift me a coffee"}, {UiIconId::ButtonB, "Back"}};
 }
 
 void SupportPage::SubmitKey(int key)
@@ -386,7 +387,7 @@ void SupportPage::StartRun()
 {
     m_state = State::Running;
     m_scroll = 0.0f;
-    m_speed = 95.0f;
+    m_speed = 120.0f;
     m_distance = 0.0f;
     m_runTime = 0.0f;
     m_yunoY = kGroundY;
@@ -441,7 +442,7 @@ void SupportPage::Generate()
             if (m_distance < 600.0f && sprite == SpriteIndex("rock3"))
                 sprite = SpriteIndex("rock2");
             m_pieces.push_back({m_genX, kTileW, PieceKind::Ground});
-            const float w = static_cast<float>(m_sprites[sprite].w);
+            const float w = m_sprites[sprite].w * kObstacleScale;
             m_obstacles.push_back({m_genX + std::max(0.0f, (kTileW - w) / 2.0f), sprite});
             m_genX += kTileW;
         }
@@ -450,7 +451,7 @@ void SupportPage::Generate()
     // (what scrolled off)
     while (!m_pieces.empty() && m_pieces.front().x + m_pieces.front().w < m_scroll - 8.0f)
         m_pieces.erase(m_pieces.begin());
-    while (!m_obstacles.empty() && m_obstacles.front().x + 32.0f < m_scroll)
+    while (!m_obstacles.empty() && m_obstacles.front().x + 72.0f < m_scroll)
         m_obstacles.erase(m_obstacles.begin());
 }
 
@@ -490,7 +491,9 @@ void SupportPage::EndRun(bool fell)
 
 void SupportPage::StepGame(float dt)
 {
-    m_animTime += dt;
+    m_blinkTime += dt;
+    if (m_state == State::Running)
+        m_animTime += dt; // (his legs stop when the run does)
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
     // The clouds drift (a little faster while he runs).
@@ -530,7 +533,7 @@ void SupportPage::StepGame(float dt)
 
     // Running: faster and faster.
     m_runTime += dt;
-    m_speed = std::min(220.0f, 95.0f + 4.0f * m_runTime);
+    m_speed = std::min(240.0f, 120.0f + 4.0f * m_runTime);
     m_scroll += m_speed * dt;
     m_distance += m_speed * dt;
     m_mountainScroll += m_speed * 0.2f * dt;
@@ -573,13 +576,13 @@ void SupportPage::StepGame(float dt)
     }
 
     // Bumped into something?
-    const float yx0 = m_scroll + kYunoX + 11.0f, yx1 = m_scroll + kYunoX + 34.0f;
+    const float yx0 = m_scroll + kYunoX + 13.0f, yx1 = m_scroll + kYunoX + 32.0f;
     const float yy0 = m_yunoY - 19.0f, yy1 = m_yunoY - 1.0f;
     for (const Obstacle &o : m_obstacles)
     {
         const Sprite &s = m_sprites[o.sprite];
-        const float ox0 = o.x + 1.0f, ox1 = o.x + s.w - 1.0f;
-        const float oy0 = kGroundY - s.h + 2.0f, oy1 = kGroundY;
+        const float ox0 = o.x + 2.0f, ox1 = o.x + s.w * kObstacleScale - 2.0f;
+        const float oy0 = kGroundY - s.h * kObstacleScale + 3.0f, oy1 = kGroundY;
         if (yx0 < ox1 && yx1 > ox0 && yy0 < oy1 && yy1 > oy0)
         {
             EndRun(false);
@@ -647,10 +650,10 @@ void SupportPage::Layout(UiRenderer &ui)
     m_cardLines = Wrap(ui,
                        body,
                        "Hey there! VBoy Color is free, and it always will be. If you're enjoying it and want to help "
-                       "it keep growing, you can buy me a coffee. Either way, keep being awesome!",
+                       "it keep growing, you can gift me a coffee. Either way, keep being awesome!",
                        kContentWidth - kPad * 2.0f);
     m_buttonH = 16.0f;
-    m_buttonW = ui.GetTextWidth(m_res->bodyBoldFont, "Buy me a coffee") + 34.0f;
+    m_buttonW = ui.GetTextWidth(m_res->bodyBoldFont, "Gift me a coffee") + 34.0f;
     m_buttonX = kContentX + kPad;
     m_buttonY = kContentTop + kPad + m_cardLines.size() * kLine + 4.0f;
     m_cardH = m_buttonY + m_buttonH + kPad - kContentTop;
@@ -704,7 +707,7 @@ void SupportPage::DrawCard(UiRenderer &ui, float ox, float oy, float alpha)
     ui.DrawQuadRounded(bx, by, m_buttonW, m_buttonH, WithAlpha(amber, alpha), m_buttonH / 2.0f);
     const XrColor4f dark = WithAlpha({0.12f, 0.08f, 0.04f, 1.0f}, alpha);
     DrawCoffeeCup(ui, bx + 9.0f, by + 3.0f, 10.0f, dark);
-    ui.DrawText(bold, "Buy me a coffee", bx + 25.0f, TextY(ui, bold, by + m_buttonH / 2.0f), 1.0f, dark);
+    ui.DrawText(bold, "Gift me a coffee", bx + 25.0f, TextY(ui, bold, by + m_buttonH / 2.0f), 1.0f, dark);
 }
 
 void SupportPage::DrawSide(UiRenderer &ui, float ox, float oy, float alpha)
@@ -743,13 +746,13 @@ void SupportPage::DrawSide(UiRenderer &ui, float ox, float oy, float alpha)
 }
 
 void SupportPage::DrawSprite(UiRenderer &ui, int sprite, float gx, float gy, float ox, float oy, float alpha,
-                             float brightness, int skipRows) const
+                             float brightness, int skipRows, float scale) const
 {
     const Sprite &s = m_sprites[sprite];
-    const float u = m_gameSize / kGame;
+    const float u = m_gameSize / kGame * scale;
     const int rows = s.h - skipRows;
     const float v0 = s.v0 + (s.v1 - s.v0) * skipRows / s.h;
-    ui.DrawImageRegion(m_atlas, m_gameX + gx * u + ox, m_gameY + gy * u + oy, s.w * u, rows * u, s.u0, v0, s.u1, s.v1, alpha,
+    ui.DrawImageRegion(m_atlas, m_gameX + gx * (u / scale) + ox, m_gameY + gy * (u / scale) + oy, s.w * u, rows * u, s.u0, v0, s.u1, s.v1, alpha,
                        {brightness, brightness, brightness, 1.0f});
 }
 
@@ -817,7 +820,8 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
         }
     }
     for (const Obstacle &o : m_obstacles)
-        DrawSprite(ui, o.sprite, std::round(o.x - m_scroll), kGroundY - m_sprites[o.sprite].h + 1.0f, ox, oy, alpha);
+        DrawSprite(ui, o.sprite, std::round(o.x - m_scroll), kGroundY - m_sprites[o.sprite].h * kObstacleScale + 2.0f, ox, oy, alpha,
+                   1.0f, 0, kObstacleScale);
 
     const UiFontHandle bold = m_res->bodyBoldFont, small = m_res->captionBoldFont;
     auto center = [&](UiFontHandle font, const std::string &text, float gy, const XrColor4f &color)
@@ -825,7 +829,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
         ui.DrawText(font, text, x + size / 2.0f - ui.GetTextWidth(font, text) / 2.0f, TextY(ui, font, y + gy * u), 1.0f,
                     WithAlpha(color, alpha));
     };
-    const bool blinkOn = std::fmod(m_animTime, 1.0f) < 0.65f;
+    const bool blinkOn = std::fmod(m_blinkTime, 1.0f) < 0.65f;
     const char *start = m_profile == ButtonMappingProfile::Phone ? "Tap to play"
                         : m_profile == ButtonMappingProfile::Desktop ? "Space to play"
                                                                     : "A to play";
@@ -846,7 +850,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
     {
         // Yuno.
         const bool air = !m_onGround || m_state == State::Falling;
-        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_animTime * (8.0f + m_speed / 18.0f)) % 6];
+        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_animTime * (6.0f + m_speed / 40.0f)) % 6];
         const int shown = m_state == State::GameOver && m_yunoY > kGame ? -1 : frame;
         if (shown >= 0)
             DrawSprite(ui, shown, kYunoX, std::round(m_yunoY) - m_sprites[shown].h + 1.0f, ox, oy, alpha);

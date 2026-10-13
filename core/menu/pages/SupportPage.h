@@ -10,7 +10,7 @@ struct AppSettings;
 class Platform;
 class Emulator;
 
-// Support (the sidebar, above Quit): a few words from Juan and a "Buy me a
+// Support (the sidebar, above Quit): a few words from Juan and a "Gift me a
 // coffee" button (his GitHub Sponsors page, one time) - and under it Yuno's
 // Adventure, a little endless runner in the Virtual Boy's reds starring his
 // cat Yuno (his sister Nucita shows up far away now and then). Jump
@@ -110,7 +110,7 @@ private:
     void DrawGame(UiRenderer &ui, float ox, float oy, float alpha);
     void DrawSide(UiRenderer &ui, float ox, float oy, float alpha);
     void DrawSprite(UiRenderer &ui, int sprite, float gx, float gy, float ox, float oy, float alpha,
-                    float brightness = 1.0f, int skipRows = 0) const;
+                    float brightness = 1.0f, int skipRows = 0, float scale = 1.0f) const;
 
     const UiMenuResources *m_res = nullptr;
     AppSettings *m_settings = nullptr;
@@ -148,7 +148,8 @@ private:
     float m_yunoY = 0, m_yunoVy = 0; // his feet, game pixels from the top
     bool m_onGround = true;
     float m_jumpBuffer = 0; // (a jump pressed just before landing still counts)
-    float m_animTime = 0;
+    float m_animTime = 0;  // (his running legs - still once the run ends)
+    float m_blinkTime = 0; // (the prompts' blink)
     float m_overTime = 0;   // since the run ended
     bool m_newBest = false;
     std::vector<Piece> m_pieces;
