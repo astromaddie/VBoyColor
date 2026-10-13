@@ -32,6 +32,7 @@ on:
       - ".gitignore"
       - "tools/**.py"
       - "tools/**.ps1"
+      - "tools/**.bat"
       - "tools/harness/**"
   pull_request:
     paths-ignore:
@@ -42,6 +43,7 @@ on:
       - ".gitignore"
       - "tools/**.py"
       - "tools/**.ps1"
+      - "tools/**.bat"
       - "tools/harness/**"
   workflow_dispatch:
 
