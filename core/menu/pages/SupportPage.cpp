@@ -16,7 +16,7 @@ namespace
     // size in menu units.
     constexpr float kGame = 190.0f;
     constexpr float kGroundY = 152.0f; // the ground's top
-    constexpr float kHillY = 128.0f;   // where Nucita walks, far away
+    constexpr float kHillY = kGroundY + 1.0f; // the mountains' feet (behind the ground's edge) - and Nucita's, far away
     constexpr float kYunoX = 20.0f;   // (his sprite's left: the tail - his body from +11 to +34)
     constexpr float kGravity = 1150.0f, kJumpSpeed = 310.0f;
     constexpr float kTileW = 24.0f, kEdgeW = 15.0f;
@@ -772,9 +772,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
     // The mountains.
     for (const Mountain &m : m_mountains)
         DrawSprite(ui, m.sprite, std::round(m.x - m_mountainScroll), kHillY - m_sprites[m.sprite].h + 1.0f, ox, oy, alpha, 0.42f);
-    // The hills' line (the mountains' feet), and Nucita on it during a run.
-    for (float hx = -std::fmod(m_scroll * 0.35f, 6.0f); hx < kGame; hx += 6.0f)
-        ui.DrawQuad(x + std::max(0.0f, hx) * u, y + kHillY * u, 3.0f * u, u, WithAlpha({0.3f, 0.0f, 0.0f, 1.0f}, alpha));
+    // Nucita, far away at the mountains' feet, now and then during a run.
     if (m_state != State::Title)
     {
         if (m_nucita != NucitaMode::Away)
@@ -790,7 +788,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
                 sprite = m_sNucitaWalk[static_cast<int>(m_nucitaTimer * 7.0f) % 4];
             else
                 sprite = std::fmod(m_nucitaTimer, 2.4f) > 2.25f ? m_sNucitaBlink : m_sNucitaSit;
-            DrawSprite(ui, sprite, std::round(m_nucitaX), kHillY - m_sprites[sprite].h - lift, ox, oy, alpha, 0.7f);
+            DrawSprite(ui, sprite, std::round(m_nucitaX), kHillY - m_sprites[sprite].h - lift, ox, oy, alpha, 0.55f);
         }
     }
 

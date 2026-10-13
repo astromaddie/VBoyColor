@@ -13,7 +13,7 @@ class Emulator;
 // Support (the sidebar, above Quit): a few words from Juan and a "Buy me a
 // coffee" button (his GitHub Sponsors page, one time) - and under it Yuno's
 // Adventure, a little endless runner in the Virtual Boy's reds starring his
-// cat Yuno (his sister Nucita shows up on the far hills now and then). Jump
+// cat Yuno (his sister Nucita shows up far away now and then). Jump
 // over rocks, bushes and gaps: A (any face button on a gamepad, Space or Enter on a
 // keyboard), a click or a tap on the game, or the trigger pointing at it.
 // The arrows still move out of it - and leaving the game (or the page, or
@@ -160,7 +160,7 @@ private:
     int m_lastMountain = -1;
     void GenerateMountains();
     float m_genX = 0, m_nextEventX = 0, m_nextCloud = 0;
-    // Nucita, far away on the hills.
+    // Nucita, far away at the mountains' feet.
     enum class NucitaMode
     {
         Away,
