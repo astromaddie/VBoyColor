@@ -387,7 +387,7 @@ else()
     # relink every time trades a bit of link speed for actually picking up
     # changes, which matters a lot for the F5 edit-build-run loop.
     if(MSVC)
-        target_link_options(VBoyColorVR PRIVATE "/INCREMENTAL:NO")
+        target_link_options(VBoyColorVR PRIVATE "/INCREMENTAL:NO" "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
     endif()
 
     if(TARGET openxr_loader AND WIN32)
@@ -438,7 +438,9 @@ else()
     )
     target_link_libraries(VBoyColor PRIVATE vbgo_app glfw)
     if(MSVC)
-        target_link_options(VBoyColor PRIVATE "/INCREMENTAL:NO")
+        # (a window app: no console window - Settings > Log window opens one;
+        # main() stays the entry point)
+        target_link_options(VBoyColor PRIVATE "/INCREMENTAL:NO" "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
     endif()
     if(WIN32)
         # See VBoyColorVR's identical target_sources call above for why

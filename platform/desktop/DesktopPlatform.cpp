@@ -804,3 +804,50 @@ int DesktopPlatform::PollDownload(std::vector<uint8_t> &bytes, int slot)
     }
     return state;
 }
+
+#if defined(_WIN32)
+void DesktopPlatform::ShowLogWindow(bool show)
+{
+    const bool has = GetConsoleWindow() != nullptr;
+    if (show == has)
+        return;
+    if (!show)
+    {
+        std::fflush(stdout);
+        std::fflush(stderr);
+        // (the log goes nowhere again)
+        FILE *f = nullptr;
+        freopen_s(&f, "NUL", "w", stdout);
+        freopen_s(&f, "NUL", "w", stderr);
+        FreeConsole();
+        return;
+    }
+    if (!AllocConsole())
+        return;
+    SetConsoleTitleW(L"VBoy Color - log");
+    FILE *f = nullptr;
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stderr, nullptr, _IONBF, 0);
+    // (closing a console window ends the app it belongs to: no close button -
+    // Settings > Log window closes it)
+    if (HWND console = GetConsoleWindow())
+        if (HMENU menu = GetSystemMenu(console, FALSE))
+            DeleteMenu(menu, SC_CLOSE, MF_BYCOMMAND);
+    std::printf("VBoy Color's log - Settings > Log window closes it.\n");
+}
+#endif
+
+void DesktopPlatform::ShowFatalError(const std::string &message)
+{
+#if defined(_WIN32)
+    const int length = MultiByteToWideChar(CP_UTF8, 0, message.c_str(), -1, nullptr, 0);
+    std::wstring wide(length > 0 ? length : 1, L'\0');
+    if (length > 0)
+        MultiByteToWideChar(CP_UTF8, 0, message.c_str(), -1, wide.data(), length);
+    MessageBoxW(nullptr, wide.c_str(), L"VBoy Color", MB_OK | MB_ICONERROR);
+#else
+    std::fprintf(stderr, "%s\n", message.c_str());
+#endif
+}

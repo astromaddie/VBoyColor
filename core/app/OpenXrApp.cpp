@@ -246,6 +246,8 @@ void OpenXrApp::Initialize(const InitInfo &info)
     CreateSwapchains();
 
     m_settings.Load(*m_platform); // no-op (defaults stand) on first run/missing file
+    if (m_settings.logWindow)
+        m_platform->ShowLogWindow(true);
     ApplyDefaultGameplayBindings(m_settings);
     m_appMenu.Initialize(m_uiRenderer, static_cast<VkFormat>(m_colorFormat), m_emulator, m_settings, *m_platform,
                          ButtonMappingProfile::Vr, m_passthroughExtAvailable);

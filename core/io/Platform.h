@@ -147,6 +147,10 @@ public:
     // closes apps). The main loop ends once QuitRequested, and cleans up as
     // on any close. ----
     virtual bool CanQuit() const { return false; }
+    // ---- The log window (Windows: the app runs without a console; Settings >
+    // Log window opens one, for the curious and for bug reports). ----
+    virtual bool HasLogWindow() const { return false; }
+    virtual void ShowLogWindow(bool /*show*/) {}
     virtual void RequestQuit() {}
     virtual bool QuitRequested() const { return false; }
 

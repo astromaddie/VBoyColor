@@ -47,6 +47,16 @@ public:
 
     int GetBatteryPercent() const override { return -1; } // no real battery to read off Android
 
+#if defined(_WIN32)
+    // A console window for the log (stdout and stderr) - the app itself has
+    // none. Its close button is taken away: closing a console ends its app.
+    bool HasLogWindow() const override { return true; }
+    void ShowLogWindow(bool show) override;
+#endif
+    // Something went wrong before the app could show anything: a message box
+    // on Windows (there's no console to read it in), stderr elsewhere.
+    static void ShowFatalError(const std::string &message);
+
     // On a thread of its own: WinHTTP on Windows, curl elsewhere.
     bool StartDownload(const std::string &url, int slot = kDownloadBoxArt) override;
     int PollDownload(std::vector<uint8_t> &bytes, int slot = kDownloadBoxArt) override;

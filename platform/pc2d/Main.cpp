@@ -439,7 +439,7 @@ int main(int argc, char **argv)
 
     if (!glfwInit())
     {
-        std::fprintf(stderr, "VBoy Color: glfwInit failed\n");
+        DesktopPlatform::ShowFatalError("VBoy Color couldn't start: glfwInit failed.");
         return 1;
     }
     // (the text fields' Copy and Paste - see DesktopPlatform::getClipboard)
@@ -455,7 +455,7 @@ int main(int argc, char **argv)
     GLFWwindow *window = glfwCreateWindow(windowWidth, windowHeight, "VBoy Color", nullptr, nullptr);
     if (!window)
     {
-        std::fprintf(stderr, "VBoy Color: glfwCreateWindow failed\n");
+        DesktopPlatform::ShowFatalError("VBoy Color couldn't open its window (glfwCreateWindow failed).");
         glfwTerminate();
         return 1;
     }
@@ -486,6 +486,8 @@ int main(int argc, char **argv)
     AppMenu appMenu;
     AppSettings settings;
     settings.Load(platform); // no-op (defaults stand) on first run/missing file
+    if (settings.logWindow)
+        platform.ShowLogWindow(true);
     ApplyDefaultGameplayBindings(settings);
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -1021,6 +1023,8 @@ int main(int argc, char **argv)
     catch (const std::exception &ex)
     {
         std::fprintf(stderr, "VBoy Color: %s\n", ex.what());
+        DesktopPlatform::ShowFatalError(std::string("VBoy Color stopped: ") + ex.what() +
+                                        "\n\nIt needs a graphics driver with Vulkan.");
         exitCode = 1;
     }
 

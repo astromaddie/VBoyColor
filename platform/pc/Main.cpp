@@ -66,6 +66,9 @@ int main()
     catch (const std::exception &ex)
     {
         std::fprintf(stderr, "VBoy Color VR: init failed: %s\n", ex.what());
+        DesktopPlatform::ShowFatalError(std::string("VBoy Color VR couldn't start: ") + ex.what() +
+                                        "\n\nIt needs a PC VR runtime (Quest Link / Air Link, Virtual Desktop or SteamVR) "
+                                        "running, and a headset connected.");
         return 1;
     }
 

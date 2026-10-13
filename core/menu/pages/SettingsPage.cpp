@@ -229,6 +229,20 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
             nullptr, nullptr, UiIconId::RomList);
     }
 
+    // Windows: the app has no console - the log, in a window of its own, when asked for.
+    if (m_platform->HasLogWindow())
+    {
+        list->AddHeader("Troubleshooting");
+        auto log = list->AddEntry("Log window", [this](MenuItem *)
+                                  {
+                                      m_settings->logWindow = !m_settings->logWindow;
+                                      m_platform->ShowLogWindow(m_settings->logWindow);
+                                      m_settings->Save(*m_platform);
+                                  },
+                                  nullptr, nullptr, UiIconId::Header);
+        log->toggle = [this]() { return m_settings && m_settings->logWindow; };
+    }
+
     m_menu.MenuItems.push_back(list);
     m_menu.Init();
 

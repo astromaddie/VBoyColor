@@ -47,6 +47,8 @@ namespace
             return offsetof(AppSettings, paintingTools);
         case 22:
             return offsetof(AppSettings, yunoBest);
+        case 23:
+            return offsetof(AppSettings, logWindow);
         default:
             return 0;
         }
