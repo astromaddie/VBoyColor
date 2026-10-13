@@ -157,10 +157,9 @@ pack).*
 
 - **Support, and Yuno's Adventure** - Support in the menu's sidebar: if
   you'd like to buy me a coffee, the button there opens my GitHub Sponsors
-  page. Under it, coffee or not, a little endless runner in the Virtual
-  Boy's reds: my cat Yuno jumps rocks, bushes and gaps while her sister
-  Nucita watches from the hills (A, Space, a click or a tap to jump; your
-  best score is kept).
+  page. Under it, a little thank-you for stopping by: an endless runner in
+  the Virtual Boy's reds, where my cat Yuno jumps rocks, bushes and gaps
+  (A, Space, a click or a tap to jump; your best score is kept).
 
 ## Getting started
 

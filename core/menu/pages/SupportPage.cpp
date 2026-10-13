@@ -636,8 +636,7 @@ void SupportPage::Layout(UiRenderer &ui)
     m_gameSize = std::floor(kContentBottom - m_gameY);
     m_gameX = kContentRight - m_gameSize;
     const float sideW = m_gameX - kContentX - 10.0f;
-    m_sideLines = Wrap(ui, body, "Coffee or not, my cat Yuno is always up for a run - and her sister Nucita likes to "
-                                 "watch from the hills.",
+    m_sideLines = Wrap(ui, body, "A little thank-you for stopping by: help my cat Yuno run as far as she can.",
                        sideW);
     if (m_profile == ButtonMappingProfile::Phone)
     {
