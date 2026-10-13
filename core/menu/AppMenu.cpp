@@ -761,7 +761,8 @@ void AppMenu::Update(uint32_t buttonStates[3], uint32_t lastButtonStates[3], flo
     }
 
     // Thumbnails are made while the menu is open (the game paused).
-    m_thumbnails.Update(m_open);
+    // (not while Yuno's Adventure is being played: decoding and uploading them makes it stutter)
+    m_thumbnails.Update(m_open && !m_supportPage.Playing());
 
     // RetroAchievements: its web requests, and its notices over the game.
     if (m_resources.emulator)

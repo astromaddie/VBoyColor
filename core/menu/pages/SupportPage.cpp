@@ -3,6 +3,7 @@
 #include "emu/Emulator.h"
 #include "io/Platform.h"
 #include "io/Settings.h"
+#include "menu/AppMenu.h"
 #include "menu/pages/AppMenuLayout.h"
 #include "menu/pages/YunoSprites.h"
 
@@ -216,7 +217,21 @@ void SupportPage::SetFocused(bool focused)
 {
     m_focused = focused;
     if (!focused)
+    {
         StopGame(); // (out of the page: the run ends)
+        m_buttonHover = false;
+        if (m_urlPending && m_platform)
+            m_platform->OpenUrl(kSponsorUrl);
+        m_urlPending = false;
+        m_pressTime = -1.0f;
+    }
+}
+
+void SupportPage::PressButton()
+{
+    // A little squish and a ring, then the page (a moment later, so the click shows).
+    m_pressTime = 0.0f;
+    m_urlPending = true;
 }
 
 void SupportPage::ResetSelection()
@@ -279,10 +294,34 @@ void SupportPage::Update(uint32_t *buttonState, uint32_t *lastButtonState, float
         }
     };
 
+    // (a key or button moving the focus shows the highlight again)
+    if (up || down || left || right || a || padB || otherB || xy)
+        m_mouseLeft = false;
+    // (the pointer went off the page - to the sidebar, or out of the menu: not over the button any more)
+    if (!m_hoverSeen)
+    {
+        if (m_buttonHover)
+            m_mouseLeft = true;
+        m_buttonHover = false;
+    }
+    m_hoverSeen = false;
+    if (m_pressTime >= 0.0f)
+    {
+        m_pressTime += deltaSeconds;
+        if (m_urlPending && m_pressTime >= 0.2f)
+        {
+            m_urlPending = false;
+            if (m_platform)
+                m_platform->OpenUrl(kSponsorUrl);
+        }
+        if (m_pressTime > 0.45f)
+            m_pressTime = -1.0f;
+    }
+
     if (m_focus == Focus::Button)
     {
-        if (a && m_platform)
-            m_platform->OpenUrl(kSponsorUrl);
+        if (a)
+            PressButton();
         else if (down || right)
             m_focus = Focus::Game;
         else if (left)
@@ -314,19 +353,22 @@ void SupportPage::HandlePointer(const MenuPointer &pointer)
     const bool inButton = x >= m_buttonX && x <= m_buttonX + m_buttonW && y >= m_buttonY && y <= m_buttonY + m_buttonH;
     const bool inGame = x >= m_gameX && x <= m_gameX + m_gameSize && y >= m_gameY && y <= m_gameY + m_gameSize;
     const bool inJump = m_jumpR > 0.0f && std::hypot(x - m_jumpX, y - m_jumpY) <= m_jumpR + 2.0f;
+    m_hoverSeen = true;
+    if (pointer.moved && m_buttonHover && !inButton)
+        m_mouseLeft = true; // (moved off it: no highlight)
     m_buttonHover = inButton;
     // (hovering moves the focus - but never out of a run)
     if (pointer.moved && inButton && m_state != State::Running)
     {
         StopGame();
         m_focus = Focus::Button;
+        m_mouseLeft = false;
     }
     if (pointer.clicked && inButton)
     {
         StopGame();
         m_focus = Focus::Button;
-        if (m_platform)
-            m_platform->OpenUrl(kSponsorUrl);
+        PressButton();
     }
     // The game jumps the moment it's pressed (a mouse, a finger, a laser's trigger).
     if (pointer.pressed && (inGame || inJump))
@@ -493,7 +535,10 @@ void SupportPage::StepGame(float dt)
 {
     m_blinkTime += dt;
     if (m_state == State::Running)
+    {
         m_animTime += dt; // (his legs stop when the run does)
+        m_runPhase += dt * (6.0f + m_speed / 40.0f);
+    }
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
     // The clouds drift (a little faster while he runs).
@@ -695,19 +740,37 @@ void SupportPage::DrawCard(UiRenderer &ui, float ox, float oy, float alpha)
         ui.DrawText(body, line, kContentX + kPad + ox, TextY(ui, body, y + kLine / 2.0f) + oy, 1.0f, WithAlpha(kMenuTextColor, alpha));
         y += kLine;
     }
-    // The button: amber, the cup and the words in the page's dark.
-    const bool selected = m_focused && m_focus == Focus::Button;
-    const float bx = m_buttonX + ox, by = m_buttonY + oy;
+    // The button: amber, the cup and the words in the page's dark. Selected
+    // (or under the pointer): a white ring, a lighter amber.
+    const bool selected = m_focused && m_focus == Focus::Button && !m_mouseLeft;
+    const bool lit = m_buttonHover || selected;
+    // Its click: squished, then springing back a little past its size - and a ring spreading out.
+    float scale = 1.0f;
+    if (m_pressTime >= 0.0f)
+    {
+        constexpr float kPi = 3.14159265f;
+        const float t = m_pressTime;
+        scale = t < 0.12f ? 1.0f - 0.1f * std::sin(t / 0.12f * kPi / 2.0f)
+              : t < 0.3f  ? 0.9f + 0.14f * std::sin((t - 0.12f) / 0.18f * kPi / 2.0f)
+                          : 1.04f - 0.04f * std::min(1.0f, (t - 0.3f) / 0.15f);
+        const float spread = std::min(1.0f, t / 0.45f);
+        const float grow = 9.0f * spread;
+        ui.DrawQuadRounded(m_buttonX + ox - grow, m_buttonY + oy - grow, m_buttonW + grow * 2.0f, m_buttonH + grow * 2.0f,
+                           WithAlpha({1.0f, 0.79f, 0.34f, 0.45f * (1.0f - spread)}, alpha), m_buttonH / 2.0f + grow);
+    }
+    const float w = m_buttonW * scale, h = m_buttonH * scale;
+    const float bx = m_buttonX + ox + (m_buttonW - w) / 2.0f, by = m_buttonY + oy + (m_buttonH - h) / 2.0f;
     if (selected)
-        ui.DrawQuadRounded(bx - 2.0f, by - 2.0f, m_buttonW + 4.0f, m_buttonH + 4.0f, WithAlpha({1.0f, 1.0f, 1.0f, 0.9f}, alpha),
-                           m_buttonH / 2.0f + 2.0f);
+        ui.DrawQuadRounded(bx - 2.0f, by - 2.0f, w + 4.0f, h + 4.0f, WithAlpha({1.0f, 1.0f, 1.0f, 0.9f}, alpha), h / 2.0f + 2.0f);
     XrColor4f amber = kMenuSelectionColor;
-    if (m_buttonHover || selected)
+    if (lit)
         amber = {1.0f, 0.86f, 0.5f, 1.0f};
-    ui.DrawQuadRounded(bx, by, m_buttonW, m_buttonH, WithAlpha(amber, alpha), m_buttonH / 2.0f);
+    if (m_pressTime >= 0.0f && m_pressTime < 0.2f)
+        amber = {1.0f, 0.93f, 0.72f, 1.0f}; // (a flash while pressed)
+    ui.DrawQuadRounded(bx, by, w, h, WithAlpha(amber, alpha), h / 2.0f);
     const XrColor4f dark = WithAlpha({0.12f, 0.08f, 0.04f, 1.0f}, alpha);
-    DrawCoffeeCup(ui, bx + 9.0f, by + 3.0f, 10.0f, dark);
-    ui.DrawText(bold, "Gift me a coffee", bx + 25.0f, TextY(ui, bold, by + m_buttonH / 2.0f), 1.0f, dark);
+    DrawCoffeeCup(ui, bx + 9.0f * scale, by + 3.0f * scale, 10.0f * scale, dark);
+    ui.DrawText(bold, "Gift me a coffee", bx + 25.0f * scale, TextY(ui, bold, by + h / 2.0f), scale, dark);
 }
 
 void SupportPage::DrawSide(UiRenderer &ui, float ox, float oy, float alpha)
@@ -756,6 +819,15 @@ void SupportPage::DrawSprite(UiRenderer &ui, int sprite, float gx, float gy, flo
                        {brightness, brightness, brightness, 1.0f});
 }
 
+float SupportPage::Snap(float gamePixels) const
+{
+    // To the screen's own pixels (not the game's, which are about one and a
+    // quarter of them): everything glides by in even steps, frame after frame.
+    const float menuScale = m_res && m_res->appMenu ? m_res->appMenu->GetMenuScale() : kMenuScale;
+    const float perGamePixel = m_gameSize / kGame * menuScale;
+    return perGamePixel > 0.0f ? std::round(gamePixels * perGamePixel) / perGamePixel : gamePixels;
+}
+
 void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
 {
     const float x = m_gameX + ox, y = m_gameY + oy, size = m_gameSize, u = size / kGame;
@@ -771,10 +843,10 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
 
     // The sky, far away.
     for (const Cloud &c : m_clouds)
-        DrawSprite(ui, c.sprite, std::round(c.x), c.y, ox, oy, alpha, 0.55f);
+        DrawSprite(ui, c.sprite, Snap(c.x), c.y, ox, oy, alpha, 0.55f);
     // The mountains.
     for (const Mountain &m : m_mountains)
-        DrawSprite(ui, m.sprite, std::round(m.x - m_mountainScroll), kHillY - m_sprites[m.sprite].h + 1.0f, ox, oy, alpha, 0.42f);
+        DrawSprite(ui, m.sprite, m.x - Snap(m_mountainScroll), kHillY - m_sprites[m.sprite].h + 1.0f, ox, oy, alpha, 0.42f);
     // Nucita, far away at the mountains' feet, now and then during a run.
     if (m_state != State::Title)
     {
@@ -791,14 +863,14 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
                 sprite = m_sNucitaWalk[static_cast<int>(m_nucitaTimer * 7.0f) % 4];
             else
                 sprite = std::fmod(m_nucitaTimer, 2.4f) > 2.25f ? m_sNucitaBlink : m_sNucitaSit;
-            DrawSprite(ui, sprite, std::round(m_nucitaX), kHillY - m_sprites[sprite].h - lift, ox, oy, alpha, 0.55f);
+            DrawSprite(ui, sprite, Snap(m_nucitaX), kHillY - m_sprites[sprite].h - lift, ox, oy, alpha, 0.55f);
         }
     }
 
     // The ground.
     for (const Piece &p : m_pieces)
     {
-        const float px = std::round(p.x - m_scroll);
+        const float px = p.x - Snap(m_scroll);
         if (px > kGame || px + p.w < 0.0f)
             continue;
         switch (p.kind)
@@ -820,7 +892,7 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
         }
     }
     for (const Obstacle &o : m_obstacles)
-        DrawSprite(ui, o.sprite, std::round(o.x - m_scroll), kGroundY - m_sprites[o.sprite].h * kObstacleScale + 2.0f, ox, oy, alpha,
+        DrawSprite(ui, o.sprite, o.x - Snap(m_scroll), kGroundY - m_sprites[o.sprite].h * kObstacleScale + 2.0f, ox, oy, alpha,
                    1.0f, 0, kObstacleScale);
 
     const UiFontHandle bold = m_res->bodyBoldFont, small = m_res->captionBoldFont;
@@ -850,10 +922,10 @@ void SupportPage::DrawGame(UiRenderer &ui, float ox, float oy, float alpha)
     {
         // Yuno.
         const bool air = !m_onGround || m_state == State::Falling;
-        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_animTime * (6.0f + m_speed / 40.0f)) % 6];
+        const int frame = air ? m_sJump : m_sRun[static_cast<int>(m_runPhase) % 6];
         const int shown = m_state == State::GameOver && m_yunoY > kGame ? -1 : frame;
         if (shown >= 0)
-            DrawSprite(ui, shown, kYunoX, std::round(m_yunoY) - m_sprites[shown].h + 1.0f, ox, oy, alpha);
+            DrawSprite(ui, shown, kYunoX, Snap(m_yunoY) - m_sprites[shown].h + 1.0f, ox, oy, alpha);
         // The score.
         const std::string hud = (m_settings && m_settings->yunoBest > 0 ? "HI " + Digits(m_settings->yunoBest) + "  " : "") +
                                 Digits(Score());

@@ -39,6 +39,8 @@ public:
 
     // A key pressed on a real keyboard (GLFW's code - see AppMenu::SubmitRawKey): Space jumps.
     void SubmitKey(int key);
+    // A run going on (the library's thumbnails wait meanwhile - see AppMenu::Update).
+    bool Playing() const { return m_focused && m_state == State::Running; }
 
     // The sidebar's icon (and the button's): a cup of coffee on its saucer, size x size.
     static void DrawCoffeeCup(UiRenderer &ui, float x, float y, float size, const XrColor4f &color);
@@ -101,6 +103,7 @@ private:
     void StepGame(float dt);
     void Generate();      // the ground and what's on it, ahead of the screen
     void EndRun(bool fell);
+    float Snap(float gamePixels) const;
     int Score() const { return static_cast<int>(m_distance / 10.0f); }
     void PlaySound(const std::vector<int16_t> &sound);
 
@@ -121,6 +124,11 @@ private:
     bool m_focused = false;
     Focus m_focus = Focus::Button;
     bool m_buttonHover = false;
+    bool m_hoverSeen = false;     // (the pointer reported over the page this frame)
+    bool m_mouseLeft = false;     // the pointer moved off the button: no highlight until a key or button moves the focus
+    float m_pressTime = -1.0f;    // the button's click animation (seconds since the press, -1 none)
+    bool m_urlPending = false;    // (the page opens once the animation has shown)
+    void PressButton();
 
     // The card's text, wrapped (Layout), and where things are.
     bool m_laidOut = false;
@@ -148,6 +156,7 @@ private:
     float m_yunoY = 0, m_yunoVy = 0; // his feet, game pixels from the top
     bool m_onGround = true;
     float m_jumpBuffer = 0; // (a jump pressed just before landing still counts)
+    float m_runPhase = 0; // (which of his six running frames - at a pace that follows his speed)
     float m_animTime = 0;  // (his running legs - still once the run ends)
     float m_blinkTime = 0; // (the prompts' blink)
     float m_overTime = 0;   // since the run ended
