@@ -502,7 +502,16 @@ int main(int argc, char **argv)
 
         VkInstance instance = renderer.CreateInstanceStandalone(instanceExtensions);
         CheckVk(glfwCreateWindowSurface(instance, window, nullptr, &surface), "glfwCreateWindowSurface");
-        renderer.CreateDeviceForSurface(surface);
+        // The graphics chip (Settings > Screen > Graphics chip): Automatic
+        // takes a dedicated one - the first one Vulkan lists can be a
+        // laptop's built-in chip (an Iris Xe there held a frame ~0.5 s every
+        // ~12 s).
+        {
+            using Pref = VulkanRenderer::GpuPreference;
+            const GpuChoice choice = static_cast<GpuChoice>(settings.gpuChoice);
+            renderer.CreateDeviceForSurface(surface, choice == GpuChoice::Integrated ? Pref::Integrated : Pref::Dedicated);
+            platform.SetGraphicsChips(static_cast<int>(renderer.GpuNames().size()), renderer.GpuInUse());
+        }
 
         // Prefer an sRGB surface format - matches the color-space handling
         // UiRenderer's image-loading path (UiRenderer::LoadImage) expects.

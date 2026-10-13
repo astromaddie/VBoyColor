@@ -5,6 +5,7 @@
 #define STBI_ONLY_PNG
 #include "stb_image.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
@@ -160,7 +161,7 @@ VkInstance VulkanRenderer::CreateInstanceStandalone(const std::vector<const char
     return m_instance;
 }
 
-void VulkanRenderer::CreateDeviceForSurface(VkSurfaceKHR surface)
+void VulkanRenderer::CreateDeviceForSurface(VkSurfaceKHR surface, GpuPreference preference)
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
@@ -169,6 +170,26 @@ void VulkanRenderer::CreateDeviceForSurface(VkSurfaceKHR surface)
     if (devices.empty())
     {
         throw std::runtime_error("VulkanRenderer: no Vulkan physical devices found");
+    }
+
+    m_gpuNames.clear();
+    for (VkPhysicalDevice device : devices)
+    {
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(device, &props);
+        m_gpuNames.push_back(props.deviceName);
+    }
+    // The chips of the preferred kind first, the rest as listed.
+    if (preference != GpuPreference::FirstListed)
+    {
+        const VkPhysicalDeviceType wanted = preference == GpuPreference::Dedicated ? VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+                                                                                   : VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+        std::stable_partition(devices.begin(), devices.end(), [wanted](VkPhysicalDevice device)
+                              {
+                                  VkPhysicalDeviceProperties props{};
+                                  vkGetPhysicalDeviceProperties(device, &props);
+                                  return props.deviceType == wanted;
+                              });
     }
 
     for (VkPhysicalDevice candidate : devices)
@@ -194,6 +215,12 @@ void VulkanRenderer::CreateDeviceForSurface(VkSurfaceKHR surface)
     if (m_physicalDevice == VK_NULL_HANDLE)
     {
         throw std::runtime_error("VulkanRenderer: no Vulkan device with graphics+present support for this surface");
+    }
+    {
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(m_physicalDevice, &props);
+        m_gpuInUse = props.deviceName;
+        std::fprintf(stderr, "[Vulkan] Drawing with \"%s\" (%zu graphics chip(s))\n", props.deviceName, m_gpuNames.size());
     }
 
     const float queuePriority = 1.0f;

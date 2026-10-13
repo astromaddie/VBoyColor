@@ -30,7 +30,22 @@ public:
     // the actual window/surface (e.g. via GLFW) and passes the surface in
     // just to pick a physical device/queue that can present to it.
     VkInstance CreateInstanceStandalone(const std::vector<const char *> &instanceExtensions);
-    void CreateDeviceForSurface(VkSurfaceKHR surface);
+    // Which kind of graphics chip CreateDeviceForSurface tries first, on a
+    // PC with more than one (see AppSettings::gpuChoice): FirstListed - the
+    // first one Vulkan lists that can draw to the surface (the phone);
+    // Integrated / Dedicated - the first such chip of that kind, else the
+    // first listed.
+    enum class GpuPreference
+    {
+        FirstListed,
+        Integrated,
+        Dedicated,
+    };
+    void CreateDeviceForSurface(VkSurfaceKHR surface, GpuPreference preference = GpuPreference::FirstListed);
+    // The chips Vulkan lists (names, as listed) and the one drawing - after
+    // CreateDeviceForSurface.
+    const std::vector<std::string> &GpuNames() const { return m_gpuNames; }
+    const std::string &GpuInUse() const { return m_gpuInUse; }
 
     void Shutdown();
 
@@ -82,6 +97,8 @@ private:
 
     VkInstance m_instance{VK_NULL_HANDLE};
     VkPhysicalDevice m_physicalDevice{VK_NULL_HANDLE};
+    std::vector<std::string> m_gpuNames;
+    std::string m_gpuInUse;
     VkDevice m_device{VK_NULL_HANDLE};
     VkQueue m_queue{VK_NULL_HANDLE};
     uint32_t m_queueFamilyIndex{0};

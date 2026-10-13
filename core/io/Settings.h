@@ -46,6 +46,19 @@ enum class ScreenLook
 };
 inline constexpr int kScreenLookCount = 3;
 
+// Settings > Screen > Graphics chip - the window app on a PC with more than
+// one (a laptop's built-in Intel or AMD chip and its NVIDIA, say), used from
+// the next start. Automatic: the dedicated one when there is one. As things
+// were before it (the first chip Vulkan listed - the built-in one on such a
+// laptop), an Iris Xe held a frame ~0.5 s every ~12 s.
+enum class GpuChoice : int32_t
+{
+    Automatic = 0,
+    Integrated,
+    Dedicated,
+};
+inline constexpr int kGpuChoiceCount = 3;
+
 // How a flat screen shows the Virtual Boy's two pictures (Settings > Screen >
 // 3D - the PC window and the phone; a headset always shows them in 3D):
 // one eye's, both side by side or one above the other for 3D TVs and
@@ -104,7 +117,7 @@ struct AppSettings
     // defaults in place) on a mismatch rather than attempting migration,
     // except from version 11, whose layout is an exact prefix of this one
     // (12 only appended selectedShadePalette) - see Settings.cpp.
-    static constexpr int kVersion = 26;
+    static constexpr int kVersion = 27;
 
     // Move Screen / Follow Head. Only OpenXrApp's quad-layer pose consumes
     // these - meaningless on the flat pc2d debug build.
@@ -208,6 +221,9 @@ struct AppSettings
     // Version 26 (appended): a development builds' performance overlay, since
     // removed - kept so the layout (and a version 26 file) stays as it was.
     bool unused26 = false;
+
+    // Version 27 (appended): the window app's graphics chip (GpuChoice).
+    int32_t gpuChoice = static_cast<int32_t>(GpuChoice::Automatic);
 
     // What the screen should be drawn with (Emulator::DrawScreen's tint/
     // patternIndex) - neutral while a shade palette is active, since its

@@ -96,6 +96,17 @@ public:
 
     std::vector<uint8_t> LoadAssetBytes(const std::string &name) override;
 
+    // The window app tells which graphics chips there are (see
+    // VulkanRenderer::CreateDeviceForSurface) - the VR app, whose chip
+    // OpenXR picks, doesn't.
+    void SetGraphicsChips(int count, const std::string &inUse)
+    {
+        m_gpuCount = count;
+        m_gpuInUse = inUse;
+    }
+    int GraphicsChipCount() const override { return m_gpuCount; }
+    std::string GraphicsChipInUse() const override { return m_gpuInUse; }
+
 private:
     // A kind's folder (UTF-8; relative ones are to the exe's folder).
     std::string FolderOf(DataKind kind) const;
@@ -108,6 +119,8 @@ private:
     std::string m_exePath;                   // the running exe (UTF-8)
     bool m_restart = false;
     bool m_quit = false;
+    int m_gpuCount = 0;
+    std::string m_gpuInUse;
     std::string m_folders[kDataKindCount];   // chosen ones, "" = default
     struct Download;
     std::shared_ptr<Download> m_download[2]; // per slot (shared with its thread)

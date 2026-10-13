@@ -57,6 +57,7 @@ private:
     void RefreshLabels(bool save = true);
     void RequestChangeRomsFolder();
     void ChangeLook(int delta);
+    void ChangeGpu(int delta);
     void Change3D(int delta);       // the kind (off, side by side, top and bottom, glasses)
     void Change3DFormat(int delta); // the kind's format / glasses
 
@@ -65,6 +66,9 @@ private:
     std::shared_ptr<MenuList::Entry> m_rebuildEntry;
     std::shared_ptr<MenuList::Entry> m_lookEntry;
     std::shared_ptr<MenuList::Entry> m_sizeEntry; // (the PC window only)
+    // (the PC window on a PC with more than one graphics chip)
+    std::shared_ptr<MenuList::Entry> m_gpuEntry;
+    int m_gpuChoiceAtStart = 0; // (what the app started with - a change is used from the next start)
     std::shared_ptr<MenuList::Entry> m_threeDEntry;       // (flat screens only)
     std::shared_ptr<MenuList::Entry> m_threeDFormatEntry; // (its second row - hidden while 3D is off)
     std::shared_ptr<MenuList::Entry> m_folderEntries[kDataKindCount]; // (where Platform::SupportsDataFolders)

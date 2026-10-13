@@ -186,6 +186,15 @@ void SettingsPage::Init(UiRenderer &ui, const UiMenuResources &resources)
                                              [this](MenuItem *) { Change3DFormat(-1); },
                                              [this](MenuItem *) { Change3DFormat(1); });
     }
+    // The window app on a PC with two graphics chips (a laptop's built-in
+    // one and its NVIDIA, say) - see GpuChoice. Used from the next start.
+    if (m_platform->GraphicsChipCount() > 1)
+    {
+        m_gpuChoiceAtStart = m_settings ? m_settings->gpuChoice : 0;
+        m_gpuEntry = list->AddEntry("Graphics chip", [this](MenuItem *) { ChangeGpu(1); },
+                                    [this](MenuItem *) { ChangeGpu(-1); }, [this](MenuItem *) { ChangeGpu(1); },
+                                    UiIconId::Settings);
+    }
 
     list->AddHeader("Library");
     // Box art from libretro's thumbnail collection instead of title screens
@@ -362,6 +371,15 @@ void SettingsPage::ChangeColorChannel(float AppSettings::*channel, float delta)
     RefreshLabels();
 }
 
+void SettingsPage::ChangeGpu(int delta)
+{
+    if (!m_settings)
+        return;
+    m_settings->gpuChoice = (m_settings->gpuChoice + delta + kGpuChoiceCount) % kGpuChoiceCount;
+    m_settings->Save(*m_platform);
+    RefreshLabels();
+}
+
 void SettingsPage::ChangeLook(int delta)
 {
     if (!m_settings)
@@ -448,6 +466,14 @@ void SettingsPage::RefreshLabels(bool save)
     m_lookEntry->SetValue(kLookNames[std::clamp(m_settings->screenLook, 0, kScreenLookCount - 1)]);
     if (m_sizeEntry)
         m_sizeEntry->SetValue(m_settings->screenWholePixels ? "Whole pixels" : "Fit");
+    if (m_gpuEntry)
+    {
+        static constexpr const char *kGpuNames[kGpuChoiceCount] = {"Automatic", "Built-in", "Dedicated"};
+        const int choice = std::clamp(m_settings->gpuChoice, 0, kGpuChoiceCount - 1);
+        // (in use: the chip drawing now - a change waits for the next start)
+        m_gpuEntry->SetValue(choice != m_gpuChoiceAtStart ? std::string(kGpuNames[choice]) + " (next start)"
+                                                         : kGpuNames[choice]);
+    }
     for (int i = 0; i < kDataKindCount; ++i)
         if (m_folderEntries[i])
         {

@@ -147,6 +147,11 @@ public:
     // closes apps). The main loop ends once QuitRequested, and cleans up as
     // on any close. ----
     virtual bool CanQuit() const { return false; }
+    // ---- Graphics chips (the window app): how many Vulkan lists, and the
+    // one drawing - Settings > Screen > Graphics chip shows when there's
+    // more than one (AppSettings::gpuChoice). ----
+    virtual int GraphicsChipCount() const { return 0; }
+    virtual std::string GraphicsChipInUse() const { return ""; }
     // ---- The log window (Windows: the app runs without a console; Settings >
     // Log window opens one, for the curious and for bug reports). ----
     virtual bool HasLogWindow() const { return false; }
