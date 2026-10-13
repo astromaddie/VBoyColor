@@ -57,7 +57,14 @@ namespace
     void HintFrameRate(ANativeWindow *window, float fps)
     {
         using SetFrameRate = int32_t (*)(ANativeWindow *, float, int8_t);
-        static const auto setFrameRate = reinterpret_cast<SetFrameRate>(dlsym(RTLD_DEFAULT, "ANativeWindow_setFrameRate"));
+        static const SetFrameRate setFrameRate = []() -> SetFrameRate
+        {
+            void *lib = dlopen("libandroid.so", RTLD_NOW);
+            auto found = lib ? reinterpret_cast<SetFrameRate>(dlsym(lib, "ANativeWindow_setFrameRate")) : nullptr;
+            if (!found)
+                LOGI("[Phone] Frame rate hint: not available (Android 10)");
+            return found;
+        }();
         if (!window || !setFrameRate)
             return;
         const int32_t result = setFrameRate(window, fps, 1 /* ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE */);
