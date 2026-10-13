@@ -489,6 +489,10 @@ private:
     // made for, 0 when it's out of date.
     UiImageHandle m_anaglyphTexture;
     int m_anaglyphMade = 0;
+    // The LED look's picture, prepared when the game's changes (twice as tall:
+    // decoded on top, the glow below - see screen_filter.frag's LedPrepared).
+    UiImageHandle m_ledTexture;
+    bool m_ledReady = false;
     bool m_coreInitialized = false;
     bool m_romLoaded = false;
     uint64_t m_screenVersion = 0; // see ScreenVersion

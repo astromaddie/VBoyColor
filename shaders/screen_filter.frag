@@ -292,6 +292,63 @@ vec3 Led(vec2 position, vec2 outPixel) {
     return lit + glow / total * 0.35;
 }
 
+// ---------------------------------------------------------------------------
+// LED, prepared (mode 3 - the same look for a fraction of the work): what
+// doesn't depend on where in a game pixel the screen pixel is gets worked out
+// once per game pixel when the picture changes (Emulator::PrepareScreen,
+// modes 4 and 5 below, into a texture twice as tall: the picture decoded to
+// linear on top, its glow below - read through an _SRGB view, so the texture
+// unit decodes it and its bilinear filter blends linear light). Per screen
+// pixel that leaves two filtered reads and the beam: no more 11 reads, 10
+// exp() and the sRGB decodes of Led() - too much for a phone's GPU at its
+// screen's full size.
+
+vec3 LedPrepared(vec2 position, vec2 outPixel, vec2 texSize) {
+    // Along a row: the two columns blended (Led()'s smoothstep), one
+    // filtered read on the row's middle - kept inside the eye's picture.
+    float x = position.x - 0.5;
+    float cx = floor(x);
+    float fx = smoothstep(0.2, 0.8, x - cx);
+    vec2 lo = vec2(gRectMin) + vec2(0.5), hi = vec2(gRectMax) + vec2(0.5);
+    vec2 litAt = vec2(clamp(cx + 0.5 + fx, lo.x, hi.x), clamp(floor(position.y) + 0.5, lo.y, hi.y));
+    vec3 lit = texture(uImage, litAt / texSize).rgb;
+
+    // Across rows: the LED's line (as Led()).
+    float dy = fract(position.y) - 0.5;
+    float beam = exp(-dy * dy / (2.0 * 0.26 * 0.26));
+    float shown = pc.cornerRadiusPx > 0.0 ? pc.cornerRadiusPx : 1.0 / outPixel.y;
+    float structure = clamp((shown - 2.0) / 2.0, 0.0, 1.0);
+    lit *= mix(1.0, beam * 1.3, structure);
+
+    // The glow: the per-pixel glow below, filtered between pixels.
+    vec2 glowAt = clamp(position, lo, hi) + vec2(0.0, texSize.y * 0.5);
+    vec3 glow = texture(uImage, glowAt / texSize).rgb;
+    return lit + glow * 0.35;
+}
+
+// Mode 4: a game pixel decoded to linear (drawn 1:1 into the prepared
+// texture's top half, whose _SRGB target encodes it again: the same bytes,
+// now read decoded and filtered).
+vec3 LedPrepareLit(vec2 position) {
+    return SrgbToLinear(Fetch(ivec2(floor(position))));
+}
+
+// Mode 5: a game pixel's glow (Led()'s, at the pixel's middle - the 3x3
+// weighted by distance; drawn 1:1 into the bottom half, one eye at a time so
+// it stays inside the eye).
+vec3 LedPrepareGlow(vec2 position) {
+    ivec2 at = ivec2(floor(position));
+    const float side = 0.53940, corner = 0.29096; // exp(-1/(2*0.9^2)), exp(-2/(2*0.9^2))
+    vec3 glow = vec3(0.0);
+    for (int j = -1; j <= 1; ++j)
+        for (int i = -1; i <= 1; ++i) {
+            vec3 c = Fetch(at + ivec2(i, j));
+            float w = (i == 0 && j == 0) ? 1.0 : (i == 0 || j == 0) ? side : corner;
+            glow += c * c * w;
+        }
+    return glow / (1.0 + 4.0 * side + 4.0 * corner);
+}
+
 void main() {
     vec2 texSize = vec2(textureSize(uImage, 0));
     gRectMin = ivec2(floor(pc.uvRect.xy * texSize + 0.5));
@@ -312,6 +369,16 @@ void main() {
     outPixel = floor(outPixel * 4096.0 + 0.5) / 4096.0;
 
     // (The target is _SRGB: what's written is linear.)
-    vec3 color = mode == 2 ? Led(position, outPixel) : SrgbToLinear(clamp(OmniScale(position, length(outPixel)), 0.0, 1.0));
+    vec3 color;
+    if (mode == 3)
+        color = LedPrepared(position, outPixel, texSize);
+    else if (mode == 4)
+        color = LedPrepareLit(position);
+    else if (mode == 5)
+        color = LedPrepareGlow(position);
+    else if (mode == 2)
+        color = Led(position, outPixel);
+    else
+        color = SrgbToLinear(clamp(OmniScale(position, length(outPixel)), 0.0, 1.0));
     outColor = vec4(color, vColor.a);
 }

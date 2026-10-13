@@ -31,6 +31,9 @@
 
 namespace
 {
+    // screen_filter.frag's modes past the looks (see LedPrepared there).
+    constexpr int kFilterLedPrepared = 3, kFilterLedLit = 4, kFilterLedGlow = 5;
+
     // libretro's C API has no per-instance context pointer on its callbacks, so
     // there's nowhere to stash a `this` - this whole block is necessarily
     // global/singleton state, same as the core itself only supports one loaded
@@ -1589,7 +1592,10 @@ void Emulator::DrawScreen(UiRenderer &ui, float x, float y, float w, float h, Ey
         u0 = fullU1 * 0.5f;
 
     const bool pattern = patternIndex >= 0 && patternIndex < kScreenPatternCount;
-    if (look > 0 && look < kScreenLookCount && eye != Eye::Both && m_coloredReady)
+    if (look == static_cast<int>(ScreenLook::Led) && eye != Eye::Both && m_ledReady)
+        // (the prepared picture: its top half is the colored one, 1:1)
+        ui.DrawScreenFiltered(m_ledTexture, x, y, w, h, u0, 0.0f, u1, v1 * 0.5f, kFilterLedPrepared, shownPixelSize);
+    else if (look > 0 && look < kScreenLookCount && eye != Eye::Both && m_coloredReady)
         ui.DrawScreenFiltered(m_coloredTexture, x, y, w, h, u0, 0.0f, u1, v1, look, shownPixelSize);
     else if (pattern)
         ui.DrawImageRegionPattern(m_screenTexture, x, y, w, h, u0, 0.0f, u1, v1, kScreenPatterns[patternIndex]);
@@ -1617,6 +1623,7 @@ void Emulator::PrepareScreen(UiRenderer &ui, VkFormat format, const XrColor4f &t
         m_coloredKey = key;
         m_coloredReady = true;
         m_anaglyphMade = 0;
+        m_ledReady = false;
 
         // The picture 1:1 into the same corner, colored exactly as Sharp draws it.
         ui.BeginOffscreenFrame(m_coloredTexture, XrColor4f{0.0f, 0.0f, 0.0f, 1.0f});
@@ -1635,6 +1642,22 @@ void Emulator::PrepareScreen(UiRenderer &ui, VkFormat format, const XrColor4f &t
         m_anaglyphMade = anaglyph;
         ui.BeginOffscreenFrame(m_anaglyphTexture, XrColor4f{0.0f, 0.0f, 0.0f, 1.0f});
         ui.DrawAnaglyph(m_coloredTexture, 0.0f, 0.0f, w / 2.0f, h, 0.0f, 0.0f, u1 / 2.0f, v1, u1 / 2.0f, anaglyph);
+        ui.EndFrame();
+    }
+
+    // The LED look: what it works out per game pixel, once per picture (see
+    // screen_filter.frag's LedPrepared) - the picture decoded on top, its glow
+    // below, each eye's glow kept inside the eye.
+    if (look == static_cast<int>(ScreenLook::Led) && anaglyph <= 0 && !m_ledReady)
+    {
+        if (!m_ledTexture.IsValid())
+            m_ledTexture = ui.CreateRenderTexture(kFbWidth, kFbHeight * 2, format, false);
+        m_ledReady = true;
+        const float half = w / 2.0f, halfU = u1 / 2.0f, below = static_cast<float>(kFbHeight);
+        ui.BeginOffscreenFrame(m_ledTexture, XrColor4f{0.0f, 0.0f, 0.0f, 1.0f});
+        ui.DrawScreenFiltered(m_coloredTexture, 0.0f, 0.0f, w, h, 0.0f, 0.0f, u1, v1, kFilterLedLit);
+        ui.DrawScreenFiltered(m_coloredTexture, 0.0f, below, half, h, 0.0f, 0.0f, halfU, v1, kFilterLedGlow);
+        ui.DrawScreenFiltered(m_coloredTexture, half, below, w - half, h, halfU, 0.0f, u1, v1, kFilterLedGlow);
         ui.EndFrame();
     }
 }
