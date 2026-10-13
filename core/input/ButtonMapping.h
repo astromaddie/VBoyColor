@@ -83,6 +83,19 @@ namespace ButtonMapper {
     // actually affect gameplay, instead of each platform hardcoding VB bits.
     uint32_t TranslateToVBBitmask(const uint32_t buttonStates[3], const MappedButtons (&vbButtons)[16]);
 
+    // Not a Virtual Boy button: the 16 slots' free slot 1 (the VB's buttons
+    // use 0, 2-8 and 10-15) holds the button that opens the app's menu -
+    // Button mapping's "Menu" row, unset until the player picks one. Never
+    // sent to the game (TranslateToVBBitmask skips it).
+    const uint32_t MenuSlot = 1;
+
+    // The Menu row's bindings: the mapping's own (a game's), else - a game
+    // mapped before the row existed, or without one - the general one's.
+    const MappedButtons &MenuBindings(const MappedButtons (&mapping)[16], const MappedButtons (&general)[16]);
+    // Whether one of them is down (gamepad and controllers - a key is the
+    // window app's to check).
+    bool MenuButtonDown(const uint32_t buttonStates[3], const MappedButtons &menu);
+
     // Gamepad defaults in every Virtual Boy button's second slot (the first
     // holds the platform's own default - controllers or keyboard), only
     // where that slot is unset: left D-pad on the D-pad, right D-pad on the

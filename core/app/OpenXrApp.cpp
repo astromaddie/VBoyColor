@@ -953,6 +953,15 @@ void OpenXrApp::RenderFrame()
     if (menuButtonPressed && !m_lastMenuButtonPressed)
         m_appMenu.ToggleOpen();
     m_lastMenuButtonPressed = menuButtonPressed;
+    // The menu's own button (Button mapping > Menu) opens it from a game.
+    {
+        uint32_t states[3] = {m_buttonStates[0], m_buttonStates[1], m_buttonStates[2]};
+        const bool mappedMenu = ButtonMapper::MenuButtonDown(
+            states, ButtonMapper::MenuBindings(m_appMenu.Controls().Buttons(m_settings), m_settings.vbButtons));
+        if (mappedMenu && !m_mappedMenuWasDown && !m_appMenu.IsOpen() && m_emulator.HasGame())
+            m_appMenu.Show();
+        m_mappedMenuWasDown = mappedMenu;
+    }
 
     UpdateMenuPointer(frameState.predictedDisplayTime);
     m_appMenu.Update(m_buttonStates, m_lastButtonStates, deltaSeconds);

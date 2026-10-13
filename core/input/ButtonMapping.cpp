@@ -10,6 +10,8 @@ uint32_t TranslateToVBBitmask(const uint32_t buttonStates[3], const MappedButton
     uint32_t vbBits = 0;
     for (uint32_t vbBit = 0; vbBit < 16; ++vbBit)
     {
+        if (vbBit == MenuSlot)
+            continue; // (the app's menu, not the game's)
         for (const MappedButton &binding : vbButtons[vbBit].Buttons)
         {
             if (!binding.IsSet)
@@ -24,6 +26,21 @@ uint32_t TranslateToVBBitmask(const uint32_t buttonStates[3], const MappedButton
         }
     }
     return vbBits;
+}
+
+const MappedButtons &MenuBindings(const MappedButtons (&mapping)[16], const MappedButtons (&general)[16])
+{
+    const MappedButtons &own = mapping[MenuSlot];
+    return own.Buttons[0].IsSet || own.Buttons[1].IsSet ? own : general[MenuSlot];
+}
+
+bool MenuButtonDown(const uint32_t buttonStates[3], const MappedButtons &menu)
+{
+    for (const MappedButton &binding : menu.Buttons)
+        if (binding.IsSet && binding.InputDevice >= 0 && binding.InputDevice <= 2 && binding.ButtonIndex >= 0 &&
+            binding.ButtonIndex < EmuButtonCount && (buttonStates[binding.InputDevice] & ButtonMapping[binding.ButtonIndex]))
+            return true;
+    return false;
 }
 
 void ApplyDefaultGamepadBindings(MappedButtons (&vbButtons)[16], bool byPosition)

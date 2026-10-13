@@ -108,11 +108,28 @@ namespace
         };
         for (uint32_t vbBit = 0; vbBit < 16; ++vbBit)
             for (const MappedButton &binding : mapping[vbBit].Buttons)
-                if (binding.IsSet && binding.InputDevice == DeviceKeyboard &&
+                if (vbBit != MenuSlot && binding.IsSet && binding.InputDevice == DeviceKeyboard &&
                     binding.ButtonIndex >= 0 && binding.ButtonIndex <= GLFW_KEY_LAST &&
                     glfwGetKey(window, binding.ButtonIndex) == GLFW_PRESS && !suppressedKey(binding.ButtonIndex))
                     result |= (1u << vbBit);
         return result;
+    }
+
+    // Button mapping's Menu row (ButtonMapper::MenuSlot): its gamepad
+    // button or key is down.
+    bool MappedMenuDown(GLFWwindow *window, const AppSettings &settings, const AppMenu &appMenu)
+    {
+        using namespace ButtonMapper;
+        uint32_t buttonStates[3] = {0, 0, 0};
+        buttonStates[DeviceGamepad] = GamepadCompanionBits(PollDesktopGamepads().bits);
+        const MappedButtons &menu = MenuBindings(appMenu.Controls().Buttons(settings), settings.vbButtons);
+        if (MenuButtonDown(buttonStates, menu))
+            return true;
+        for (const MappedButton &binding : menu.Buttons)
+            if (binding.IsSet && binding.InputDevice == DeviceKeyboard && binding.ButtonIndex >= 0 &&
+                binding.ButtonIndex <= GLFW_KEY_LAST && glfwGetKey(window, binding.ButtonIndex) == GLFW_PRESS)
+                return true;
+        return false;
     }
 
     // Fills in vbButtons/menu-button slots that have never been bound yet
@@ -619,6 +636,7 @@ int main(int argc, char **argv)
         // doesn't read input for (see AppMenu::Show/Hide/ToggleOpen).
         // Edge-triggered so holding the key doesn't spam-toggle every frame.
         bool tabWasPressed = false;
+        bool mappedMenuWasDown = false;
         bool escWasPressed = false;
         // Experimental tile colorization tools (see Emulator::SetTileDebugView /
         // CaptureTileReference): F9 toggles the per-tile debug view, F10 saves
@@ -730,6 +748,12 @@ int main(int argc, char **argv)
             if (padMenu && !tabWasPressed)
                 appMenu.ToggleOpen();
             tabWasPressed = padMenu;
+            // The menu's own button (Button mapping > Menu) opens it from a
+            // game - it doesn't close it (the button may be one the menu uses).
+            const bool mappedMenu = !g_typing && MappedMenuDown(window, settings, appMenu);
+            if (mappedMenu && !mappedMenuWasDown && !appMenu.IsOpen() && emulator.HasGame())
+                appMenu.Show();
+            mappedMenuWasDown = mappedMenu;
 
             // The color pack tools on F4 to F12 (Settings > Hotkeys > Painting
             // tools - off, those keys are the hotkeys'), without Ctrl or Alt.

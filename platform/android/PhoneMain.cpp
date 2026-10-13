@@ -458,7 +458,7 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     std::string editGame;       // ...a game's own (Library: hold its card), or ""
 
     uint32_t buttonStates[3]{}, lastButtonStates[3]{};
-    bool menuComboWasHeld = false, backWasHeld = false;
+    bool menuComboWasHeld = false, backWasHeld = false, mappedMenuWasDown = false;
     std::string shownRom;
     auto lastFrameTime = std::chrono::steady_clock::now();
     bool fatal = false;
@@ -681,6 +681,15 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         menuComboWasHeld = combo;
         if (backTapped && !menuWasOpen && !appMenu.IsOpen() && emulator.HasGame())
             appMenu.Show();
+        // The menu's own button (Button mapping > Menu) opens it from a game.
+        {
+            uint32_t pad[3] = {ButtonMapper::GamepadCompanionBits(buttonStates[ButtonMapper::DeviceGamepad]), 0, 0};
+            const bool mappedMenu = ButtonMapper::MenuButtonDown(
+                pad, ButtonMapper::MenuBindings(appMenu.Controls().Buttons(settings), settings.vbButtons));
+            if (mappedMenu && !mappedMenuWasDown && !menuWasOpen && !appMenu.IsOpen() && emulator.HasGame())
+                appMenu.Show();
+            mappedMenuWasDown = mappedMenu;
+        }
         backWasHeld = state.backHeld;
 
         // "Back to game" beside the menu (Back works too - not every phone

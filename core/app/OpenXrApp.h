@@ -222,6 +222,7 @@ private:
     // m_appMenu open/closed (see XrInput::IsMenuButtonPressed) - a held
     // button shouldn't toggle every frame.
     bool m_lastMenuButtonPressed{false};
+    bool m_mappedMenuWasDown{false}; // (Button mapping > Menu)
     // The hand whose laser drives the menu's pointer (0 left, 1 right) and
     // last frame's triggers.
     int m_pointerHand{1};

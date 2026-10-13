@@ -34,6 +34,8 @@ const ButtonRow kButtons[] = {
     {"R-Right", UiIconId::MapRightRight, VBButtonBit::RightRight},
     {"Start", UiIconId::MapStart, VBButtonBit::Start},
     {"Select", UiIconId::MapSelect, VBButtonBit::Select},
+    // (not a VB button: the app's menu, from the game - see ButtonMapper::MenuSlot)
+    {"Menu", UiIconId::Settings, ButtonMapper::MenuSlot},
 };
 constexpr int kButtonCount = static_cast<int>(sizeof(kButtons) / sizeof(kButtons[0]));
 
