@@ -25,6 +25,7 @@
 #include <android/log.h>
 #include <android/native_window.h>
 #include <android/window.h>
+#include <dlfcn.h>
 #include <android_native_app_glue.h>
 
 #include <algorithm>
@@ -49,6 +50,20 @@ namespace
     // emulator's frame times): the app's work (input, menu, handing the game
     // its time), waiting for a picture to draw into, recording the drawing,
     // the GPU drawing it (EndFrame waits for it) and handing it to the screen.
+    // Android 11+: tells the system this window shows a 50 fps game (0: no
+    // preference), so a phone with a 50, 100 or 60 Hz mode can use it instead
+    // of redrawing the same game frame at 90 or 120 Hz - less GPU work, and
+    // steadier pacing. (dlsym: Android 10 doesn't have it.)
+    void HintFrameRate(ANativeWindow *window, float fps)
+    {
+        using SetFrameRate = int32_t (*)(ANativeWindow *, float, int8_t);
+        static const auto setFrameRate = reinterpret_cast<SetFrameRate>(dlsym(RTLD_DEFAULT, "ANativeWindow_setFrameRate"));
+        if (!window || !setFrameRate)
+            return;
+        const int32_t result = setFrameRate(window, fps, 1 /* ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE */);
+        LOGI("[Phone] Frame rate hint: %s (%d)", fps > 0.0f ? "50 fps game" : "none", static_cast<int>(result));
+    }
+
     struct RefreshTimes
     {
         enum Part
@@ -491,6 +506,8 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
     auto lastFrameTime = std::chrono::steady_clock::now();
     bool fatal = false;
     RefreshTimes refreshTimes;
+    float hintedFps = -1.0f;
+    ANativeWindow *hintedWindow = nullptr;
 
     for (;;)
     {
@@ -750,6 +767,15 @@ void RunPhoneApp(android_app *app, AndroidPlatform &platform)
         // (the lifted fingers have been seen)
         for (auto it = state.fingers.begin(); it != state.fingers.end();)
             it = it->second.up ? state.fingers.erase(it) : std::next(it);
+
+        // (a game being played: 50 fps - the menu keeps the screen's own rate)
+        const float wantedFps = emulator.HasGame() && !appMenu.IsVisible() && !editing ? 50.0f : 0.0f;
+        if (wantedFps != hintedFps || state.window != hintedWindow)
+        {
+            hintedFps = wantedFps;
+            hintedWindow = state.window;
+            HintFrameRate(state.window, wantedFps);
+        }
 
         if (appMenu.NeedsDraw())
             appMenu.RenderToBuffer(uiRenderer);
