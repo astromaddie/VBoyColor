@@ -9,7 +9,7 @@ rem
 rem Needs Android Studio (Gradle fetches the NDK and CMake versions the app
 rem uses if they're missing) and, so the APK installs over the GitHub builds,
 rem keystore.dir in android\local.properties (tools\make_release_key.ps1 sets
-rem it). The first build takes a few minutes; later ones only rebuild what
+rem it - or the bat finds its folder by itself). The first build takes a few minutes; later ones only rebuild what
 rem changed. The log is saved as tools\vboycolor-log.txt.
 
 setlocal
@@ -26,6 +26,19 @@ if /i not "%~1"=="nopull" (
         exit /b 1
     )
 )
+rem The emulator core and the other libraries are git submodules (a plain
+rem clone or pull leaves them empty).
+if /i not "%~1"=="nopull" (
+    git submodule update --init --recursive
+) else if not exist "third_party\beetle-vb-libretro\mednafen\vb\vip.c" (
+    git submodule update --init --recursive
+)
+if not exist "third_party\beetle-vb-libretro\mednafen\vb\vip.c" (
+    echo.
+    echo The submodules didn't download ^(third_party\...^) - see above.
+    pause
+    exit /b 1
+)
 
 rem --- Java and the Android SDK: Android Studio's, unless set already ---
 if not defined JAVA_HOME if exist "%ProgramFiles%\Android\Android Studio\jbr\bin\java.exe" set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
@@ -37,6 +50,15 @@ if not defined JAVA_HOME (
 )
 if not defined ANDROID_HOME if exist "%LOCALAPPDATA%\Android\Sdk" set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
 
+rem --- The release key: tools\make_release_key.ps1's folder, if
+rem local.properties doesn't name one yet ---
+set "KEYDIR=%USERPROFILE:\=/%/VBoyColor-signing"
+findstr /b "keystore.dir" android\local.properties >nul 2>nul
+if errorlevel 1 if exist "%USERPROFILE%\VBoyColor-signing\keystore.txt" (
+    >>android\local.properties echo.
+    >>android\local.properties echo keystore.dir=%KEYDIR%
+    echo Signing with the release key in %USERPROFILE%\VBoyColor-signing
+)
 findstr /b "keystore.dir" android\local.properties >nul 2>nul
 if errorlevel 1 (
     echo.
