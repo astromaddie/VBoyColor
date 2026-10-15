@@ -1,9 +1,9 @@
 <h1 align="center"><img src="assets/logo/vboycolor-logo.png" alt="VBoy Color" width="380"></h1>
 
-<p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest, on PC, and on Android phones and handhelds.</b></p>
+<p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest and the Steam Frame, on PC, and on Android phones and handhelds.</b></p>
 
 VBoy Color is a free, open-source Virtual Boy emulator. On a Quest headset
-it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
+or a Steam Frame it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
 3D, but in color instead of red on black. On Windows and Linux it plays them
 in a window, no headset needed, and on Android phones, tablets and handhelds
 with touch controls or a gamepad. It is also a RetroArch core, for Windows,
@@ -84,7 +84,7 @@ pack).*
   games with color packs). Pick with the
   sticks, a gamepad, the mouse, or by pointing a Quest controller and
   pulling its trigger.
-- **Real 3D on Quest** - each eye gets its own picture, as on the hardware,
+- **Real 3D on Quest and the Steam Frame** - each eye gets its own picture, as on the hardware,
   and both eyes always show the same colors. The display runs at the
   headset's highest refresh rate, so scrolling stays smooth.
 - **Save states** - several slots per game, with thumbnails in color.
@@ -181,6 +181,21 @@ allowed to pick that rate itself. [Quest Games Optimizer](https://anagan79.itch.
 can, or `adb shell setprop debug.oculus.refreshRate 100` (until the headset
 restarts); VBoy Color then keeps it instead of asking for 120 Hz.
 
+### Steam Frame
+
+1. Download `VBoyColor-<version>-linux-arm64.tar.gz` from
+   [Releases](https://github.com/yuk27/VBoyColor/releases) and unpack it in
+   your home folder on the Frame.
+2. Put your `.vb` ROMs in its `roms` folder.
+3. Add `VBoyColorVR` to Steam as a non-Steam game and start it from the
+   library (started from Steam, SteamVR hands it the controllers).
+
+The buttons are the Quest's - A and B, Y for Start, X for Select, Menu for
+the menu - plus the D-pad as the left D-pad, the bumpers as L and R and View
+as Select. SteamVR picks the refresh rate: set VBoyColorVR to 100 Hz (or
+120 Hz) in its per-app settings for the smoothest scrolling. More in
+[docs/STEAM_FRAME.md](docs/STEAM_FRAME.md).
+
 ### Android phones and tablets
 
 The same `VBoyColor-<version>-quest-android-arm64.apk` works on phones, tablets
@@ -224,6 +239,8 @@ VR version for a PC headset (Quest Link, Virtual Desktop or SteamVR).
 
 Download `VBoyColor-<version>-linux-x64.tar.gz`, unpack it, put your ROMs in
 `roms` and run `./VBoyColor` from that folder. Needs a Vulkan driver.
+`./VBoyColorVR` is the VR version, for a PC headset on SteamVR. For an ARM64
+machine, download `VBoyColor-<version>-linux-arm64.tar.gz` instead.
 
 ### RetroArch
 
