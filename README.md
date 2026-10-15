@@ -84,9 +84,11 @@ pack).*
   games with color packs). Pick with the
   sticks, a gamepad, the mouse, or by pointing a Quest controller and
   pulling its trigger.
-- **Real 3D on Quest and the Steam Frame** - each eye gets its own picture, as on the hardware,
-  and both eyes always show the same colors. The display runs at the
-  headset's highest refresh rate, so scrolling stays smooth.
+- **Real 3D on Quest and the Steam Frame** - each eye gets its own
+  picture, as on the hardware, and both eyes always show the same colors.
+  On Quest the display runs at the headset's highest refresh rate, so
+  scrolling stays smooth; on the Steam Frame SteamVR picks the rate (set it
+  per app in SteamVR's settings - 100 or 120 Hz).
 - **Save states** - several slots per game, with thumbnails in color.
 - **RetroAchievements** - log in with your
   [RetroAchievements](https://retroachievements.org) account (Achievements in
