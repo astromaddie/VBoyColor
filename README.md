@@ -2,12 +2,12 @@
 
 <p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest and the Steam Frame, on PC, and on Android phones and handhelds.</b></p>
 
-VBoy Color is a free, open-source Virtual Boy emulator. On a Quest headset
-or a Steam Frame it shows games the way the Virtual Boy was meant to be seen, in stereoscopic
-3D, but in color instead of red on black. On Windows and Linux it plays them
-in a window, no headset needed, and on Android phones, tablets and handhelds
-with touch controls or a gamepad. It is also a RetroArch core, for Windows,
-Linux, macOS, Android and the Nintendo Switch (homebrew).
+VBoy Color is a free, open-source Virtual Boy emulator. On a Quest or Frame
+headset it shows games the way the Virtual Boy was meant to be seen, in
+stereoscopic 3D, but in color instead of red on black. On Windows and Linux
+it plays them in a window, no headset needed, and on Android phones, tablets
+and handhelds with touch controls or a gamepad. It is also a RetroArch core,
+for Windows, Linux, macOS, Android and the Nintendo Switch (homebrew).
 
 <p align="center"><a href="https://youtu.be/vsScgEVnbME"><img src="images/demo-video.jpg" alt="VBoy Color demo video: eight Virtual Boy games, the original red next to VBoy Color" width="720"></a><br>
 <a href="https://youtu.be/vsScgEVnbME"><b>▶ Watch the demo</b></a> - eight games, the original red next to VBoy Color (2 min)</p>
@@ -84,10 +84,10 @@ pack).*
   games with color packs). Pick with the
   sticks, a gamepad, the mouse, or by pointing a Quest controller and
   pulling its trigger.
-- **Real 3D on Quest and the Steam Frame** - each eye gets its own
+- **Real 3D on Quest and Frame** - each eye gets its own
   picture, as on the hardware, and both eyes always show the same colors.
   On Quest the display runs at the headset's highest refresh rate, so
-  scrolling stays smooth; on the Steam Frame SteamVR picks the rate (set it
+  scrolling stays smooth; on the Frame SteamVR picks the rate (set it
   per app in SteamVR's settings - 100 or 120 Hz).
 - **Save states** - several slots per game, with thumbnails in color.
 - **RetroAchievements** - log in with your
@@ -183,7 +183,7 @@ allowed to pick that rate itself. [Quest Games Optimizer](https://anagan79.itch.
 can, or `adb shell setprop debug.oculus.refreshRate 100` (until the headset
 restarts); VBoy Color then keeps it instead of asking for 120 Hz.
 
-### Steam Frame
+### Frame (Steam Frame)
 
 1. Download `VBoyColor-<version>-linux-arm64.tar.gz` from
    [Releases](https://github.com/yuk27/VBoyColor/releases) and unpack it in
