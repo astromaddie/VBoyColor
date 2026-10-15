@@ -153,6 +153,7 @@ jobs:
           strip "$dir/VBoyColor" "$dir/VBoyColorVR"
           cp -r build-pc/fonts build-pc/icons build-pc/logo build-pc/colorpacks build-pc/icon.png "$dir/"
           cp assets/PlaceRomsHere.txt "$dir/roms/"
+          cp -r assets/steam "$dir/steam" # (library artwork for adding it to Steam)
           cp -r README.md LICENSE THIRD-PARTY-NOTICES.md licenses "$dir/"
           tar czf "$dir.tar.gz" "$dir"
           echo "PACKAGE=$dir" >> "$GITHUB_ENV"

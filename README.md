@@ -189,8 +189,10 @@ restarts); VBoy Color then keeps it instead of asking for 120 Hz.
    [Releases](https://github.com/yuk27/VBoyColor/releases) and unpack it in
    your home folder on the Frame.
 2. Put your `.vb` ROMs in its `roms` folder.
-3. Add `VBoyColorVR` to Steam as a non-Steam game and start it from the
-   library (started from Steam, SteamVR hands it the controllers).
+3. Add `VBoyColorVR` to Steam as a non-Steam game, named VBoy Color, and
+   start it from the library (started from Steam, SteamVR hands it the
+   controllers). The `steam` folder has its library artwork and icon -
+   the Quest's icon and the logo - to set as its custom artwork.
 
 The buttons are the Quest's - A and B, Y for Start, X for Select, Menu for
 the menu - plus the D-pad as the left D-pad, the bumpers as L and R and View
