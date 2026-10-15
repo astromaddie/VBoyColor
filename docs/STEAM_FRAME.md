@@ -12,14 +12,15 @@ Quest and on PC.
    somewhere in your home folder on the Frame (say `~/Games/VBoyColor`).
 2. Put your `.vb` ROMs in its `roms` folder. Settings, saves and save states
    go next to them, same as the desktop apps (Settings > Folders moves them).
-3. Add `VBoyColorVR` to Steam as a non-Steam game (name it VBoy Color)
-   and start it from the library. Start it from Steam, not from a terminal:
-   SteamVR only hands the controllers to apps it launched.
-4. The `steam` folder has the library artwork, made from the logo by
-   `tools/make_icon.py`: `capsule.png` (portrait), `header.png` (wide),
-   `hero.png`, `logo.png` and `icon.png` (the Quest's icon). Set them as the
-   game's custom artwork and icon and it looks like any other game in the
-   library.
+3. Run `./install-to-steam.py` in that folder. It adds VBoy Color to Steam
+   as a non-Steam game, as a VR app, with the Quest's icon and library
+   artwork made from the logo (`steam/`, made by `tools/make_icon.py`), so
+   it looks like any other game in the library. Steam only reads its list of
+   non-Steam games when it starts, so the script closes it for a moment
+   (on SteamOS by stopping and starting Steam's service). Running it again
+   updates the entry; `--uninstall` takes it out again.
+4. Start it from the library, not from a terminal: SteamVR only hands the
+   controllers to apps it launched.
 
 ## Controls
 
