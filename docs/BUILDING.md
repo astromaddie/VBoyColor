@@ -5,7 +5,7 @@ One CMake project builds every version:
 | Target | What | Platforms |
 |---|---|---|
 | `VBoyColor` | the desktop app - a window, no headset | Windows, Linux |
-| `VBoyColorVR` | desktop VR - OpenXR, streamed to a headset | Windows |
+| `VBoyColorVR` | OpenXR VR, including native Steam Frame | Windows, Linux x86-64 and ARM64 |
 | `libvboycolor.so` | the Android app - VR on a Quest, the phone app (touch controls) on phones, tablets and handhelds; built through Gradle in `android/` | Android (arm64) |
 | `vboycolor_libretro` | the RetroArch core - its own CMake project in `platform/libretro/` (see [RetroArch core](#retroarch-core)) | Windows, Linux, macOS, Android |
 
@@ -16,15 +16,27 @@ OpenXR SDK, FreeType, GLFW) on the first configure. The emulator core is a
 git submodule:
 
 ```
-git clone --recursive https://github.com/yuk27/VBoyColor
-# or, in an existing clone:
-git submodule update --init
+git clone --recurse-submodules -b steam-frame https://github.com/astromaddie/VBoyColor.git
+cd VBoyColor
+# or, in an existing checkout of this branch:
+git submodule update --init --recursive
 ```
 
-Every push is also built by GitHub Actions (`.github/workflows/build.yml`):
-Windows (both desktop apps), Linux (desktop), Android, and the RetroArch
-core for Windows, Linux x86-64 and ARM64, macOS and Android. A tag `v*` makes a
-GitHub release with all of them attached.
+GitHub Actions (`.github/workflows/build.yml`) builds app changes on pushes and
+pull requests, or by manual dispatch. Docs-only changes are skipped. The jobs cover
+Windows (both desktop apps), Linux x86-64 and ARM64 (both apps), Android, and the
+RetroArch core. A `v*` tag runs the release workflow; Android release signing needs
+the configured secrets described below.
+
+For a Steam Frame package, use [STEAM_FRAME.md](STEAM_FRAME.md#building-it-yourself).
+The Docker route builds Linux ARM64 on an ARM64 host, or with Docker's ARM64
+emulation on another host. Building the Windows executables doesn't create a Frame
+package. Native macOS support here is for the RetroArch core; use Docker to build
+the Frame app from a Mac.
+
+Desktop builds need CMake 3.22 or newer, a C++17 compiler, Git and a build tool
+(Ninja/Make or Visual Studio). CMake 3.31.6 is used in the Frame Docker image.
+The first configure needs network access to download dependencies.
 
 ## Project layout
 
@@ -79,12 +91,15 @@ and zips it with its `roms` folder.
 sudo apt install build-essential cmake ninja-build git \
     libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libvulkan1
 cmake -B build-pc -G Ninja -DCMAKE_BUILD_TYPE=Release -DGLFW_BUILD_WAYLAND=OFF
-cmake --build build-pc --target VBoyColor
+cmake --build build-pc --target VBoyColor VBoyColorVR -j2
 cd build-pc && ./VBoyColor
 ```
 
-The build copies `fonts/` and `icons/` next to the executable. Any Vulkan 1.1
-driver works (Mesa's lavapipe too, without a GPU).
+Keep the generated `fonts/`, `icons/`, `logo/`, `colorpacks/` and `icon.png` beside
+the executables when moving a build. The flat app needs a Vulkan 1.1 driver; the VR
+app also needs an active OpenXR runtime. Linux ARM64 builds use the same targets.
+For the Frame, prefer the Ubuntu 22.04 Docker package so a newer host distro doesn't
+raise the required glibc/libstdc++ versions. See [the Frame guide](STEAM_FRAME.md).
 
 ## Android (Quest, phones and tablets)
 

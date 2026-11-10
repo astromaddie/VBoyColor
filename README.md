@@ -2,6 +2,17 @@
 
 <p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest and Steam Frame, on PC, and on Android phones and handhelds.</b></p>
 
+This is my Steam Frame fork of [yuk27/VBoyColor](https://github.com/yuk27/VBoyColor).
+The `steam-frame` branch adds native Linux ARM64 packaging, Frame controller
+bindings and a SteamVR projection-layer path so each eye gets its own Virtual Boy
+picture. It also includes a Steam library installer with artwork. No streaming PC
+or Android compatibility layer is needed on the Frame.
+
+Start with [the Frame guide](docs/STEAM_FRAME.md) for installation, controls and a
+fresh build. [BUILDING.md](docs/BUILDING.md) covers the other targets. The upstream
+project's features, credits and downloads are described below; links to
+`yuk27/VBoyColor/releases` are upstream releases, not releases made by this fork.
+
 VBoy Color is a free, open-source Virtual Boy emulator. On a Quest or Frame
 headset it shows games the way the Virtual Boy was meant to be seen, in
 stereoscopic 3D, but in color instead of red on black. On Windows and Linux
@@ -185,9 +196,11 @@ restarts); VBoy Color then keeps it instead of asking for 120 Hz.
 
 ### Frame (Steam Frame)
 
-1. Download `VBoyColor-<version>-linux-arm64.tar.gz` from
-   [Releases](https://github.com/yuk27/VBoyColor/releases) and unpack it in
-   your home folder on the Frame.
+1. Build this branch's `VBoyColorVR-linux-arm64` package using
+   [the Frame build guide](docs/STEAM_FRAME.md#building-it-yourself), then copy the
+   whole package folder to the Frame. Upstream release archives are named
+   `VBoyColor-<version>-linux-arm64.tar.gz`; those come from
+   [yuk27/VBoyColor](https://github.com/yuk27/VBoyColor/releases).
 2. Put your `.vb` ROMs in its `roms` folder.
 3. Run `./install-to-steam.py` in that folder: it adds VBoy Color to
    Steam with its icon and library artwork (Steam closes for a moment while
@@ -316,7 +329,8 @@ sidebar - press twice.
 
 See [docs/BUILDING.md](docs/BUILDING.md) - the Windows and Linux apps, PC VR,
 the Android app (Quest, phones and TVs) and the RetroArch core, all from one
-CMake project. Every push is built by GitHub Actions.
+CMake project. GitHub Actions builds app changes on pushes and pull requests;
+docs-only changes are skipped. The workflow can also be run manually.
 
 ## Support the project
 
