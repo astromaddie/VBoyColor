@@ -1,3 +1,22 @@
+## Steam Frame
+
+The Frame work is on [`steam-frame`](https://github.com/astromaddie/VBoyColor/tree/steam-frame).
+It adds native Linux ARM64 packaging, a SteamVR projection layer that keeps each
+eye's picture separate, and bindings for the Frame's controllers.
+
+Start with the [Frame build and installation guide](https://github.com/astromaddie/VBoyColor/blob/steam-frame/docs/STEAM_FRAME.md)
+for the toolchain, package and Steam library setup. You need your own Virtual Boy ROMs.
+
+```sh
+git clone --recurse-submodules --branch steam-frame https://github.com/astromaddie/VBoyColor.git
+cd VBoyColor
+```
+
+The upstream README for `main` follows. Its general downloads and build instructions
+are separate from this fork's Frame branch.
+
+---
+
 <h1 align="center"><img src="assets/logo/vboycolor-logo.png" alt="VBoy Color" width="380"></h1>
 
 <p align="center"><b>Virtual Boy games in color - in 3D on Meta Quest, on PC, and on Android phones and handhelds.</b></p>
